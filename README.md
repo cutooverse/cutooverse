@@ -42,6 +42,9 @@ Wi-Fi, only from the live site. Crawlers and link previews are skipped.
    the group; the group's id starts with `-100`.
 4. In Vercel: the project, **Settings › Environment Variables**, add `TELEGRAM_TOKEN` (the token)
    and `TELEGRAM_CHAT_ID` (the id), then **Deployments › Redeploy**.
+   A group with topics: also add `TELEGRAM_TOPIC` (the topic's number) for every message, or
+   `TELEGRAM_TOPIC_VISITS` and `TELEGRAM_TOPIC_VIDEOS` to put visits and videos in two topics. The
+   number is in the topic's link: `t.me/c/1234567890/7` is topic `7` of group `-1001234567890`.
 5. Optional, for a visitor number (#128, today 12) and at most 30 messages an hour per IP:
    **Storage** (or **Marketplace**) › **Upstash** › Redis, connected to this project. It adds its
    own settings; redeploy once more.

@@ -3,6 +3,8 @@
 // Vercel settings (Project > Settings > Environment Variables), never in the game's code:
 //   TELEGRAM_TOKEN    the bot's token from @BotFather
 //   TELEGRAM_CHAT_ID  where the messages go (your own chat id, or a group's)
+// Optional, for a group with topics: TELEGRAM_TOPIC (every message), or TELEGRAM_TOPIC_VISITS and
+// TELEGRAM_TOPIC_VIDEOS to keep the two apart; the number in a topic's link t.me/c/<group>/<topic>
 // Optional, for a visitor number and a limit on messages per IP: an Upstash Redis database from
 // Vercel's Marketplace, which adds KV_REST_API_URL / KV_REST_API_TOKEN (or UPSTASH_REDIS_REST_*).
 const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|discord|skype|curl|wget|python|headless/i;
@@ -68,10 +70,11 @@ module.exports = async (req, res) => {
   lines.push(`🌍 ${esc(place)}`, `📱 ${esc(device(ua))}${body.lang ? ` · ${esc(body.lang)}` : ""}`, `🔢 IP ${esc(ip)}`);
   if (body.ref) lines.push(`↩️ from ${esc(body.ref)}`);
 
+  const topic = Number((event === "visit" ? process.env.TELEGRAM_TOPIC_VISITS : process.env.TELEGRAM_TOPIC_VIDEOS) || process.env.TELEGRAM_TOPIC) || undefined;
   try {
     const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text: lines.join("\n"), parse_mode: "HTML", disable_web_page_preview: true }),
+      body: JSON.stringify({ chat_id: chat, message_thread_id: topic, text: lines.join("\n"), parse_mode: "HTML", disable_web_page_preview: true }),
     });
     return res.status(200).json({ ok: r.ok });
   } catch (e) {
