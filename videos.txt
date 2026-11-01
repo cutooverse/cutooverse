@@ -1,0 +1,7 @@
+# Videos for the "Watch a video" task: one YouTube link per line.
+# Any link works: youtube.com/watch?v=..., youtu.be/..., youtube.com/shorts/...
+# The task picks one at random; after it is watched, another one takes its place.
+# Lines starting with # are notes and are skipped.
+
+https://www.youtube.com/shorts/NLrVP6zoR_U,
+https://www.youtube.com/shorts/pDyLgv6xqOw

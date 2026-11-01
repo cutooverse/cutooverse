@@ -39,12 +39,13 @@ export function fruitThumb(id, glass = false) {
   const halves = slice(buildSoup(f, 3, 1), new THREE.Vector3(1, 0, 0), 0);
   const soup = halves[1];                              // the half below x = 0: its cut face looks along +x
   const { c } = volumeAndCentre(soup.P);
-  for (let i = 0; i < soup.P.length; i += 3) { soup.P[i] -= c.x; soup.P[i + 1] -= c.y; soup.P[i + 2] -= c.z; }
+  let r = 0;                                           // the half's bounding radius: long fruits fill the tile too
+  for (let i = 0; i < soup.P.length; i += 3) { soup.P[i] -= c.x; soup.P[i + 1] -= c.y; soup.P[i + 2] -= c.z; r = Math.max(r, Math.hypot(soup.P[i], soup.P[i + 1], soup.P[i + 2])); }
   const mats = fruitMaterials(id, glass, "thumb");
   const mesh = new THREE.Mesh(makeGeometry(soup), [mats.skin, mats.flesh]);
   mesh.rotation.set(-Math.PI / 2, 0, 0);               // fruit frame is z up
   mesh.rotateZ(-1.1);                                  // turn the cut face toward the camera
-  const url = shot(mesh, Math.max(...f.axes) * 5.2);
+  const url = shot(mesh, r * 3.9);
   mesh.geometry.dispose();
   cache.set(key, url);
   return url;

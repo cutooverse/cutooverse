@@ -7,16 +7,24 @@ import { perf, applyPerf } from "./perf.js";
 export const BOARD = { w: 0.44, d: 0.25, h: 0.024 };
 
 export const BACKDROPS = {
-  teal:    { name: { en: "Teal studio", fa: "استودیو سبزآبی" }, bg: "#163f42", floor: "#1b4649", ground: 0x1d4a4d, key: 0xfff1dc, rim: 0xe6fbff, light: false },
+  teal:    { name: { en: "Teal studio", fa: "استودیو سبزآبی" }, bg: "#163f42", floor: "#1b4649", ground: 0x1d4a4d, key: 0xfff1dc, rim: 0xe6fbff, light: false, map: "floor_teal.jpg" },
   studio:  { name: { en: "Soft grey", fa: "طوسی روشن" }, bg: "#cfd5db", floor: "#c3cad1", ground: 0xb8c0c8, key: 0xffffff, rim: 0xffffff, light: true },
   kitchen: { name: { en: "Kitchen", fa: "آشپزخانه" }, bg: "#e6d6bf", floor: "#d6c2a6", ground: 0xcdb898, key: 0xfff0d8, rim: 0xfff5e6, light: true },
-  night:   { name: { en: "Night", fa: "شب" }, bg: "#1b1026", floor: "#24152f", ground: 0x2a1838, key: 0xffb870, rim: 0xb889ff, light: false },
+  night:   { name: { en: "Night", fa: "شب" }, bg: "#1b1026", floor: "#24152f", ground: 0x2a1838, key: 0xffb870, rim: 0xb889ff, light: false, map: "floor_night.jpg" },
+  charcoal: { name: { en: "Charcoal", fa: "زغالی" }, bg: "#292a2d", floor: "#303235", ground: 0x2c2d30, key: 0xfff3e0, rim: 0xf2f4ff, light: false },
 };
 export const BOARDS = {
   walnut: { name: { en: "Walnut", fa: "گردو" } },
   marble: { name: { en: "Marble", fa: "مرمر" } },
   dark:   { name: { en: "Charred", fa: "سوخته" } },
   glass:  { name: { en: "Glass", fa: "شیشه" } },
+  classic: { name: { en: "Maple", fa: "افرا" } },
+};
+// the Blender project's themes: a board, a backdrop and (Halloween) the fruit that goes with it
+export const THEMES = {
+  "walnut-teal": { name: { en: "Walnut & teal", fa: "گردو و سبزآبی" }, board: "walnut", backdrop: "teal" },
+  halloween:     { name: { en: "Halloween", fa: "هالووین" }, board: "dark", backdrop: "night", fruit: "pumpkin" },
+  classic:       { name: { en: "Classic", fa: "کلاسیک" }, board: "classic", backdrop: "charcoal" },
 };
 
 export class Stage {
@@ -49,14 +57,20 @@ export class Stage {
     this.boardMats = {
       walnut: new THREE.MeshStandardMaterial({ map: tex("board.jpg"), roughness: 0.42 }),
       dark: new THREE.MeshStandardMaterial({ map: tex("board_dark.jpg"), roughness: 0.5 }),
+      classic: new THREE.MeshStandardMaterial({ map: tex("board_classic.jpg"), roughness: 0.45 }),
       marble: new THREE.MeshPhysicalMaterial({ map: marbleTexture(), roughness: 0.18, clearcoat: 0.6, clearcoatRoughness: 0.15 }),
       glass: new THREE.MeshPhysicalMaterial({ color: 0xe8f6f4, transmission: 0.92, thickness: 0.024, roughness: 0.04, ior: 1.5 }),
     };
     this.edgeMats = {
       walnut: new THREE.MeshStandardMaterial({ color: "#3a2214", roughness: 0.5 }),
       dark: new THREE.MeshStandardMaterial({ color: "#1e120c", roughness: 0.55 }),
+      classic: new THREE.MeshStandardMaterial({ color: "#b8956a", roughness: 0.5 }),
       marble: new THREE.MeshPhysicalMaterial({ color: "#e9e6e1", roughness: 0.2, clearcoat: 0.6 }),
       glass: this.boardMats.glass,
+    };
+    this.floorMaps = {};
+    this.floorTex = (url) => {                         // the theme wall's mottling, one tile every 0.9 m
+      const t = tl.load(url); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(12 / 0.9, 12 / 0.9); return t;
     };
     this.boardGeo = new THREE.BoxGeometry(BOARD.w, BOARD.h, BOARD.d);
     this.boardId = "walnut";
@@ -71,6 +85,8 @@ export class Stage {
     const b = BACKDROPS[backdropId] || BACKDROPS.teal;
     this.scene.background.set(b.bg); this.scene.fog.color.set(b.bg);
     this.floor.material.color.set(b.floor);
+    this.floor.material.map = b.map ? (this.floorMaps[b.map] ||= this.floorTex(b.map)) : null;
+    this.floor.material.needsUpdate = true;
     this.hemi.groundColor.set(b.ground);
     this.key.color.set(b.key); this.rim.color.set(b.rim);
     this.boardId = BOARDS[boardId] ? boardId : "walnut";

@@ -8,17 +8,20 @@ import { perf } from "./perf.js";
 
 export const MAXP = 160;                     // cut lines drawn on a fruit (more still count): phones cap fragment uniforms
 
-export function mulberry32(a) {
-  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
-const gaussOf = rnd => () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
-function lumps(rnd, n, sigma, w0, w1) {
-  const g = gaussOf(rnd), list = [];
-  for (let i = 0; i < n; i++) list.push([new THREE.Vector3(g(), g(), g()).normalize(), g() * sigma, w0 + rnd() * (w1 - w0)]);
-  return v => list.reduce((s, [d, a, w]) => s + a * Math.exp(-(1 - v.dot(d)) / w), 0);
-}
-const sm = (e0, e1, t) => { const x = Math.min(1, Math.max(0, (t - e0) / (e1 - e0))); return x * x * (3 - 2 * x); };
-const v3 = c => `vec3(${c.map(x => x.toFixed(3)).join(", ")})`;
+import potato from "./fruits/potato.js";
+import mango from "./fruits/mango.js";
+import strawberry from "./fruits/strawberry.js";
+import dragonfruit from "./fruits/dragonfruit.js";
+import melon from "./fruits/melon.js";
+import coconut from "./fruits/coconut.js";
+import pumpkin from "./fruits/pumpkin.js";
+import cucumber from "./fruits/cucumber.js";
+import carrot from "./fruits/carrot.js";
+import banana from "./fruits/banana.js";
+import pineapple from "./fruits/pineapple.js";
+import bamboo from "./fruits/bamboo.js";
+import { mulberry32, lumps, sm, v3 } from "./fruitkit.js";
+export { mulberry32 };
 
 // ------------------------------------------------------------------ GLSL
 const LIB = /* glsl */`
@@ -223,6 +226,8 @@ export const FRUITS = {
     skin: POM_SKIN, flesh: POM_FLESH,
   },
 };
+// the rest of the Blender project's fruits, one module each
+Object.assign(FRUITS, { potato, mango, strawberry, dragonfruit, melon, coconut, pumpkin, cucumber, carrot, banana, pineapple, bamboo });
 for (const [id, f] of Object.entries(FRUITS)) f.id = id;
 export const FRUIT_IDS = Object.keys(FRUITS);
 
@@ -233,14 +238,22 @@ export function buildSoup(fruit, seed, scale = 1) {
     const s = fruit.soup, P = Float32Array.from(s.P, v => v * scale);
     return { P, N: s.N.slice(), O: s.O.slice(), M: s.M.slice(), V: volumeAndCentre(P).V };
   }
-  const { verts, faces } = icosphere(perf.ico || 5);
-  const radius = fruit.radius(mulberry32(seed * 7919 + 13));
-  const A = fruit.axes;
-  const pos = verts.map(v => {
-    const p = new THREE.Vector3(v.x * A[0], v.y * A[1], v.z * A[2]).multiplyScalar(radius(v));
-    fruit.post?.(p, A);
-    return p;
-  });
+  let pos, faces, mat = null;
+  if (fruit.mesh) {                                    // a shape of its own: { pos, faces, mat? }
+    const m = fruit.mesh(mulberry32(seed * 7919 + 13), perf.ico || 5);
+    pos = m.pos.map(p => (p.isVector3 ? p : new THREE.Vector3(...p)));
+    faces = m.faces; mat = m.mat || null;
+  } else {                                             // a radial shape on an icosphere
+    const ico = icosphere(perf.ico || 5);
+    faces = ico.faces;
+    const radius = fruit.radius(mulberry32(seed * 7919 + 13));
+    const A = fruit.axes;
+    pos = ico.verts.map(v => {
+      const p = new THREE.Vector3(v.x * A[0], v.y * A[1], v.z * A[2]).multiplyScalar(radius(v));
+      fruit.post?.(p, A, v);
+      return p;
+    });
+  }
   const nrm = pos.map(() => new THREE.Vector3());
   const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), fn = new THREE.Vector3();
   for (const [a, b, c] of faces) {
@@ -249,6 +262,7 @@ export function buildSoup(fruit, seed, scale = 1) {
   }
   nrm.forEach(n => n.normalize());
   const T = faces.length, P = new Float32Array(T * 9), N = new Float32Array(T * 9), O = new Float32Array(T * 9), M = new Uint8Array(T);
+  if (mat) M.set(mat);                                 // e.g. a coconut's cavity wall is drawn as inside
   faces.forEach((f, t) => f.forEach((vi, k) => {
     const o = t * 9 + k * 3, p = pos[vi], n = nrm[vi];
     P[o] = p.x * scale; P[o + 1] = p.y * scale; P[o + 2] = p.z * scale;

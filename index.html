@@ -53,7 +53,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   background: linear-gradient(180deg, rgba(8, 24, 26, 0.55) 0%, rgba(8, 24, 26, 0) 42%, rgba(8, 24, 26, 0) 52%, rgba(8, 24, 26, 0.7) 100%); }
 body[data-backdrop="light"] #home { background: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 42%, rgba(255,255,255,0) 52%, rgba(255,255,255,0.75) 100%); }
 .home-top { display: flex; justify-content: space-between; align-items: center; }
-.home-top > *, .modes, .home-bottom > * { pointer-events: auto; }
+.home-top > *, .modes { pointer-events: auto; }
 .home-hint { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 0 0 12px; font-weight: 700; font-size: 14px; color: var(--ink-soft); text-shadow: var(--hud-shadow); }
 .home-hint svg { width: 18px; height: 18px; animation: nudge 1.8s ease-in-out infinite; }
 @keyframes nudge { 50% { transform: translate(4px, -3px); } }
@@ -62,14 +62,14 @@ body[data-backdrop="light"] #home { background: linear-gradient(180deg, rgba(255
 .logo h1 span { display: block; color: var(--cut); }
 .logo p { margin: 10px 0 0; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-soft); }
 body.fa .logo p { letter-spacing: 0; font-size: 15px; }
-.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(460px, 100%); margin: 0 auto; }
-.mode { position: relative; overflow: hidden; text-align: start; padding: 14px 14px 13px; border-radius: 20px; border: 1px solid var(--line);
+.modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: min(460px, 100%); margin: 0 auto; }   /* a bar of four squares */
+.mode { position: relative; overflow: hidden; aspect-ratio: 1; padding: 8px 4px; border-radius: 20px; border: 1px solid var(--line);
   background: linear-gradient(160deg, rgba(255,255,255,0.10), rgba(255,255,255,0) 55%), var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 10px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
-  display: grid; grid-template-columns: 46px 1fr; gap: 2px 12px; align-items: center; transition: transform .15s, border-color .15s; }
+  display: grid; justify-items: center; align-content: center; gap: 8px; text-align: center; transition: transform .15s, border-color .15s; }
 .mode:hover { border-color: var(--ink-soft); }
 .mode:active { transform: scale(0.97); }
-.mode .ic { grid-row: span 2; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: #fff;
+.mode .ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: #fff;
   background: var(--tone, var(--cut)); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.18), inset 0 2px 0 rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.25); }
 .mode .ic svg { width: 26px; height: 26px; }
 .ic.png { background: none !important; box-shadow: none !important; }
@@ -84,13 +84,8 @@ body.fa .logo p { letter-spacing: 0; font-size: 15px; }
 .mode[data-mode="vs"] { --tone: #f2a020; }
 .mode[data-mode="levels"] { --tone: #24a38e; }
 .mode[data-mode="free"] { --tone: #5b7fe0; }
-.mode.hero::after { content: "\203A"; position: absolute; inset-inline-end: 16px; top: 50%; transform: translateY(-54%); font-size: 34px; font-weight: 500; line-height: 1; color: var(--ink-soft); }
-[dir="rtl"] .mode.hero::after { content: "\2039"; }
-.mode b { font-size: 17px; font-weight: 800; line-height: 1.1; }
-.mode small { font-size: 12px; color: var(--ink-soft); font-weight: 500; line-height: 1.25; }
-.mode.hero { grid-column: span 2; padding: 16px; }
-.mode.hero b { font-size: 21px; }
-.home-bottom { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+#homeLooks { --tone: #a35be0; }
+.mode b { font-size: 13px; font-weight: 800; line-height: 1.1; }
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); font-weight: 700; font-size: 14px; white-space: nowrap; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .btn svg { width: 18px; height: 18px; }
 .btn.red { background: var(--cut); border-color: var(--cut); color: #fff; }
@@ -178,15 +173,27 @@ body.fa .vs-badge { font-size: 12px; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 8px; }
 .sheet-head h2 { margin: 0; font-size: 22px; font-weight: 900; }
 .sheet-head .done { padding: 9px 16px; border-radius: 999px; background: var(--sheet-ink); color: var(--sheet); font-weight: 800; font-size: 14px; }
-.tabs { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 0 12px 8px; flex-shrink: 0; }   /* wraps: every tab in view, with a mouse too */
-.tabs::-webkit-scrollbar { display: none; }
-.tab { padding: 8px 13px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--sheet-soft); white-space: nowrap; }
-.tab[aria-selected="true"] { background: var(--sheet-ink); color: var(--sheet); }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 2px 16px 10px; padding: 4px; border-radius: 14px; background: #ebe5d8; flex-shrink: 0; }
+.tabs[hidden] { display: none; }
+.tab { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 6px; border-radius: 10px; font-weight: 800; font-size: 14px; color: var(--sheet-soft); white-space: nowrap; transition: background .15s, color .15s; }
+.tab svg { width: 18px; height: 18px; flex-shrink: 0; }
+.tab[aria-selected="true"] { background: var(--sheet-card); color: var(--sheet-ink); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.tab[aria-selected="true"] svg { color: var(--cut); }
+.sec h3 em { font-style: normal; margin-inline-start: 8px; color: var(--cut); letter-spacing: 0; text-transform: none; }
+.sec + .sec, .pair + .sec { border-top: 1px solid var(--sheet-line); padding-top: 14px; }
+.pair { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; }
+.pair .seg { flex-wrap: nowrap; }
+.pair .seg button { padding: 9px 4px; font-size: 12.5px; }
+.seg .lk { width: 12px; height: 12px; margin-inline-start: 4px; vertical-align: -1px; color: var(--gold); }
+.cuts-range { display: flex; align-items: center; gap: 14px; padding: 6px 2px; }
+.cuts-range input { flex: 1; accent-color: var(--cut); height: 28px; }
+.cuts-range output { min-width: 3ch; font-size: 26px; font-weight: 900; text-align: center; }
+.cuts-range[data-off] { opacity: .45; }
 .sheet-body { overflow-y: auto; padding: 4px 16px 18px; display: grid; gap: 14px; }
 .sec h3 { margin: 4px 0 8px; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--sheet-soft); }
 body.fa .sec h3 { letter-spacing: 0; font-size: 14px; }
 .sec .note { margin: -4px 0 8px; font-size: 12px; color: var(--sheet-soft); }
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
 .tile { position: relative; border-radius: 16px; background: var(--sheet-card); border: 2px solid var(--sheet-line); padding: 8px 6px 9px; display: grid; justify-items: center; gap: 4px; text-align: center; }
 .tile img, .tile .sw { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 10px; }
 .tile .sw { display: block; }
@@ -207,6 +214,38 @@ body.fa .sec h3 { letter-spacing: 0; font-size: 14px; }
 .help { margin: 0; font-size: 14px; line-height: 1.6; color: var(--sheet-ink); max-width: 62ch; }
 body.fa .help { line-height: 1.9; }
 /* ---------------------------------------------------------------- your photo */
+/* ---------------------------------------------------------------- tasks and the video */
+.pill .more { display: grid; place-items: center; width: 18px; height: 18px; margin-inline-start: 2px; border-radius: 50%; background: var(--gold); color: #1d1405; font-size: 14px; font-weight: 900; line-height: 1; }
+.tasklist { display: grid; gap: 10px; }
+.task { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; background: var(--sheet-card); border: 1.5px solid var(--sheet-line); }
+.task { grid-template-columns: 80px 1fr auto; }
+.task .tic { position: relative; width: 80px; height: 45px; border-radius: 10px; overflow: hidden; display: grid; place-items: center; background: #ff0033; color: #fff; }
+.task .tic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.task .tic svg { position: relative; z-index: 1; width: 22px; height: 22px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+.task small.seen { display: block; margin-top: 2px; }
+.task b { display: block; font-size: 15px; font-weight: 800; }
+.task small { font-size: 12.5px; color: var(--sheet-soft); font-weight: 600; }
+.task .go { padding: 10px 16px; border-radius: 999px; background: var(--cut); color: #fff; font-weight: 800; font-size: 14px; }
+.task .go:active { transform: scale(0.96); }
+.task .got { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 13px; color: var(--sheet-soft); }
+.task .got svg { width: 15px; height: 15px; color: var(--gold); }
+.task.done .tic { background: #c9c2b4; }
+#video { position: fixed; inset: 0; z-index: 26; display: grid; place-items: center; background: rgba(6, 18, 20, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; }
+#video[hidden] { display: none; }
+.video-card { width: min(560px, 100%); background: var(--sheet); color: var(--sheet-ink); border-radius: 22px; padding: 16px; display: grid; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+.video-card h2 { margin: 0; font-size: 20px; font-weight: 900; }
+.video-box { aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #000; }
+.video-box:empty { display: none; }
+.video-box iframe, .video-box > div { width: 100%; height: 100%; border: 0; display: block; }
+.video-fail { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 18px 8px; border-radius: 14px; background: var(--sheet-card); }
+.video-fail p { margin: 0; font-weight: 600; color: var(--sheet-soft); }
+.video-bar { height: 8px; border-radius: 999px; background: #e6dfd1; overflow: hidden; }
+.video-bar i { display: block; height: 100%; background: var(--gold); transform-origin: left; transform: scaleX(0); transition: transform .25s linear; }
+[dir="rtl"] .video-bar i { transform-origin: right; }
+#videoNote { margin: 0; text-align: center; font-weight: 700; }
+#videoNote.win { color: #1e8a5a; }
+.video-card .done { justify-self: center; padding: 10px 26px; border-radius: 999px; background: var(--sheet-ink); color: var(--sheet); font-weight: 800; }
+
 #photo { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; background: rgba(6, 18, 20, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; }
 .photo-card { width: min(400px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; box-sizing: border-box; padding: 18px; border-radius: 22px; background: var(--sheet); color: var(--sheet-ink); display: grid; gap: 14px; }
 .photo-card h2 { margin: 0; font-size: 22px; font-weight: 900; }
@@ -235,10 +274,13 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.6l2.9 6 6.5.8-4.8 4.5 1.2 6.5L12 17.3 6.2 20.4l1.2-6.5L2.6 9.4l6.5-.8z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm2 0h6V8a3 3 0 0 0-6 0z"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
-  <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></g></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g></symbol>
   <symbol id="i-looks" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2-.5-1.3.4-2.6 1.8-2.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/></g><circle cx="7.5" cy="11" r="1.4" fill="currentColor"/><circle cx="10.5" cy="7.2" r="1.4" fill="currentColor"/><circle cx="15.2" cy="7.6" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-fruit" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="7"/><path d="M12 7c0-2 1-3.5 3-4"/><path d="M12 7c-2.2-1.6-4.6-1.4-6 .2 1.8 1 4 1.2 6-.2z" fill="currentColor"/></g></symbol>
+  <symbol id="i-scene" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.6" fill="currentColor"/></g></symbol>
   <symbol id="i-chop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h11l3-3H6z" fill="currentColor"/><path d="M6 13v6M10 13v6M14 13v6M18 13v6"/></g></symbol>
   <symbol id="i-vs" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="12" r="4.2"/><path d="M7 7.8v8.4"/><circle cx="17" cy="12" r="4.2"/><path d="M14 9.5l6 5M14 14.5l6-5M17 7.8v8.4"/></g></symbol>
   <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.8" fill="currentColor"/></g></symbol>
@@ -248,21 +290,18 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
 <!-- home -->
 <section id="home" class="pad">
   <div class="home-top">
-    <span class="pill"><span class="ico" data-icon="star" style="margin:0"><svg><use href="#i-star"/></svg></span><span id="starsHome">0</span></span>
+    <button class="pill" id="homeStars" type="button" aria-label="Stars and tasks"><span class="ico" data-icon="star" style="margin:0"><svg><use href="#i-star"/></svg></span><span id="starsHome">0</span><span class="more" aria-hidden="true">+</span></button>
     <button class="ib" id="homeSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
   </div>
   <div class="logo"><h1>CUT<span>COUNT</span></h1><p data-t="tagline"></p></div>
   <div>
-    <p class="home-hint"><svg><use href="#i-swipe"/></svg><span data-t="homeHint"></span></p>
-    <div class="modes">
-      <button class="mode hero" data-mode="chop" type="button"><span class="ic" data-icon="mode-chop"><svg><use href="#i-chop"/></svg></span><b data-t="mode.chop"></b><small data-t="mode.chop.d"></small></button>
-      <button class="mode" data-mode="vs" type="button"><span class="ic" data-icon="mode-vs"><svg><use href="#i-vs"/></svg></span><b data-t="mode.vs"></b><small data-t="mode.vs.d"></small></button>
-      <button class="mode" data-mode="levels" type="button"><span class="ic" data-icon="mode-puzzle"><svg><use href="#i-target"/></svg></span><b data-t="mode.levels"></b><small data-t="mode.levels.d"></small></button>
-      <button class="mode" data-mode="free" type="button" style="grid-column: span 2"><span class="ic" data-icon="mode-free"><svg><use href="#i-swipe"/></svg></span><b data-t="mode.free"></b><small data-t="mode.free.d"></small></button>
-    </div>
-    <div class="home-bottom">
-      <button class="btn red" id="homeLooks" type="button"><span class="ico" data-icon="looks" style="margin:0"><svg><use href="#i-looks"/></svg></span><span data-t="looks"></span></button>
-    </div>
+    <p class="home-hint"><svg><use href="#i-chop"/></svg><span data-t="homeHint"></span></p>
+    <nav class="modes">
+      <button class="mode" data-mode="chop" type="button"><span class="ic" data-icon="mode-chop"><svg><use href="#i-chop"/></svg></span><b data-t="mode.chop"></b></button>
+      <button class="mode" data-mode="levels" type="button"><span class="ic" data-icon="mode-puzzle"><svg><use href="#i-target"/></svg></span><b data-t="mode.levels"></b></button>
+      <button class="mode" data-mode="free" type="button"><span class="ic" data-icon="mode-free"><svg><use href="#i-swipe"/></svg></span><b data-t="mode.free"></b></button>
+      <button class="mode" id="homeLooks" type="button"><span class="ic" data-icon="looks"><svg><use href="#i-looks"/></svg></span><b data-t="looks"></b></button>
+    </nav>
   </div>
 </section>
 
@@ -318,6 +357,17 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
 <div class="toast" id="toast"></div>
 
 <input type="file" id="photoFile" accept="image/*" hidden>
+<section id="video" hidden aria-modal="true" role="dialog" aria-labelledby="videoTitle">
+  <div class="video-card">
+    <h2 id="videoTitle"></h2>
+    <div class="video-box" id="videoBox"></div>
+    <div class="video-fail" id="videoFail" hidden><p data-t="ytFail"></p><button class="btn red" id="videoOpen" type="button"><svg><use href="#i-play"/></svg><span data-t="openYT"></span></button></div>
+    <div class="video-bar"><i id="videoBar"></i></div>
+    <p class="note" id="videoNote"></p>
+    <button class="done" id="videoClose" type="button" data-t="done"></button>
+  </div>
+</section>
+
 <section id="photo" hidden aria-modal="true" role="dialog" aria-labelledby="photoTitle">
   <div class="photo-card">
     <h2 id="photoTitle" data-t="photoTitle"></h2>
