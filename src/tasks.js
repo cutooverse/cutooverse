@@ -44,7 +44,7 @@ function loadYT() {                                    // the IFrame API, once; 
 
 // onDone(task) is called once, when enough of the video has played
 export function watch(task, onDone) {
-  current = { task, onDone, watched: 0, done: false };
+  current = { task, onDone, watched: 0, done: false, via: "player" };
   $("video").hidden = false;
   $("videoTitle").textContent = task.title;
   $("videoFail").hidden = true;
@@ -75,6 +75,7 @@ function fail() {                                      // no player here (blocke
 $("videoOpen").onclick = () => {
   if (!current) return;
   window.open(`https://www.youtube.com/watch?v=${current.task.video}`, "_blank", "noopener");
+  current.via = "youtube";
   awayFrom = Date.now();
 };
 document.addEventListener("visibilitychange", () => {
@@ -90,7 +91,7 @@ function finish() {
   if (current.done) return;
   current.done = true; current.watched = current.task.seconds;
   progress();
-  current.onDone(current.task);
+  current.onDone({ ...current.task, via: current.via });
 }
 
 function progress() {

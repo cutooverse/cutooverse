@@ -95,7 +95,10 @@ export const INSTRUMENTS = {
   organ:    { oct: 1, attack: 0.025, p: [[0.5, 0.45, 0.32], [1, 1, 0.34], [2, 0.6, 0.32], [3, 0.3, 0.28], [4, 0.22, 0.26]] },
   musicbox: { oct: 2, attack: 0.002, p: [[1, 1, 1.2], [4, 0.32, 0.4], [6.3, 0.1, 0.22]] },
   marimba:  { oct: 1, attack: 0.002, p: [[1, 1, 0.45], [3.93, 0.38, 0.08], [9.2, 0.08, 0.03]] },
+  glass:    { oct: 2, attack: 0.004, p: [[1, 1, 1.4], [2.32, 0.28, 0.6], [4.25, 0.1, 0.3]] },   // a struck wine glass
 };
+// a tiny glass ping: a few inharmonic partials ringing out, as a shard does
+function ping(freq, at, gain) { voice(freq, [[1, 1, 0.18], [2.76, 0.45, 0.1], [5.4, 0.2, 0.05]], { at, attack: 0.001, gain }); }
 // cut after cut climbs a major pentatonic scale two octaves up from C4, then back down: long runs
 // keep singing and never land on a sour note
 const SCALE = [0, 2, 4, 7, 9];
@@ -109,8 +112,16 @@ function note(step, at = 0, gain = 0.16) {
 export const sfx = {
   swish() { noise(0.18, { f0: 5200, f1: 900, q: 1.2, gain: 0.45 }); },
   slice() { noise(0.12, { f0: 900, f1: 300, q: 0.8, gain: 0.8 }); noise(0.07, { f0: 2600, f1: 1800, q: 3, gain: 0.22 }); },
-  chop(i = 0, at = 0) {                               // knife through fruit into the board, `at` s from now
+  chop(i = 0, at = 0, glass = false) {                // knife through fruit into the board, `at` s from now
     const p = 1 + ((i * 37) % 11 - 5) * 0.02;
+    if (glass) {                                       // through glass: a sharp crack and a ring
+      noise(0.04, { type: "highpass", f0: 5200 * p, f1: 3000, q: 0.7, gain: 0.34, at });
+      noise(0.08, { f0: 2400 * p, f1: 1600, q: 6, gain: 0.18, at });
+      tone(140 * p, 0.05, { gain: 0.22, to: 90, at });
+      for (let k = 0; k < 3; k++) ping(2600 + Math.random() * 3400, at + k * 0.012, 0.07);
+      note(runStep(Math.max(0, i - 1)), at);
+      return;
+    }
     noise(0.05, { f0: 3200 * p, f1: 1400, q: 0.9, gain: 0.35, at });
     noise(0.09, { f0: 1100 * p, f1: 500, q: 2.2, gain: 0.28, at: at + 0.004 });   // the wet squish of the flesh
     noise(0.06, { type: "lowpass", f0: 900, f1: 300, gain: 0.7, at });
@@ -121,6 +132,16 @@ export const sfx = {
     [0, 2, 3, 5].forEach((step, k) => note(step + 5, at + k * 0.06, 0.13));
   },
   step(i) { note(runStep(i)); },
+  glassCut() {                                         // a swiped cut through glass
+    noise(0.07, { type: "highpass", f0: 6000, f1: 2500, q: 0.8, gain: 0.4 });
+    for (let k = 0; k < 4; k++) ping(2400 + Math.random() * 3800, k * 0.015, 0.07);
+  },
+  shatter() {                                          // the glass fruit falls apart: a crash, then shards raining down
+    noise(0.35, { type: "highpass", f0: 3000, f1: 7000, q: 0.6, gain: 0.38 });
+    noise(0.25, { f0: 1800, f1: 600, q: 0.9, gain: 0.25 });
+    tone(110, 0.2, { gain: 0.3, to: 55 });
+    for (let k = 0; k < 40; k++) ping(1800 + Math.random() * 5200, 0.02 + Math.random() ** 1.6 * 1.1, 0.03 + Math.random() * 0.05);
+  },
   preview() { [0, 1, 2, 3, 4].forEach(k => note(k + 5, k * 0.11, 0.15)); },
   burst() {
     noise(0.45, { f0: 600, f1: 4000, q: 0.7, gain: 0.5 });

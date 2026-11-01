@@ -11,6 +11,7 @@ import { Burst, countPieces } from "./burst.js";
 import { sfx, buzz, sound, unlock, audioLead, soundLag } from "./sound.js";
 import { t, num, setLang, getLang } from "./i18n.js";
 import { store, save, totalStars } from "./store.js";
+import { notify, notifyVisit } from "./notify.js";
 import { VIDEO_TASK, VIDEO_UNLOCK, watch, taskLine, videoList, pickVideo } from "./tasks.js";
 import { fruitThumb, knifeThumb, forgetThumbs } from "./thumbs.js";
 
@@ -68,6 +69,7 @@ function applySettings() {
   document.querySelectorAll("[data-t]").forEach(el => (el.textContent = t(el.dataset.t)));
   stage.setQuality(s.quality);
   $("starsHome").textContent = num(totalStars());
+  for (const b of [$("hudSound"), $("homeSound")]) if (!b.classList.contains("png")) b.querySelector("use").setAttribute("href", s.sound ? "#i-sound" : "#i-mute");
 }
 
 const needsVideo = (cat, id) => VIDEO_UNLOCK.includes(`${cat}.${id}`) && !store.unlocked.includes(`${cat}.${id}`);
@@ -188,7 +190,7 @@ function doChop(st) {
   st.made++;
   const dur = Math.min((style === "burst" ? 0.15 : 0.24) * Math.min(pace(), 1.8), beat(st) * 0.95);
   const hitIn = st.knife.chop(n, c, st.top, BOARD.h, dur, () => impact(st, n, c), how);
-  sfx.chop(st.made, Math.max(0, hitIn - audioLead()));  // started early by the device's sound lag: it lands on the hit
+  sfx.chop(st.made, Math.max(0, hitIn - audioLead()), glassSound());  // started early by the device's sound lag: it lands on the hit
 }
 
 function impact(st, n, c) {
@@ -258,7 +260,8 @@ function finish(st, now) {
     st.count = pieces.inSlot(st.i).filter(p => p.V > MIN_PIECE * st.fruitV).length;
     st.phase = "done";
     keepBest(st);
-    sfx.slice(); sfx.chord(); buzz("chop");
+    if (glassSound()) sfx.shatter(); else sfx.slice();
+    sfx.chord(); buzz("chop");
   } else {
     st.count = estimate;
     const pc = st.whole;
@@ -273,7 +276,8 @@ function finish(st, now) {
     }, force);
     st.phase = "burst";
     keepBest(st);
-    sfx.burst(); sfx.chord(); buzz("burst");
+    if (glassSound()) sfx.shatter(); else sfx.burst();
+    sfx.chord(); buzz("burst");
     game.shake = 0.012;
   }
 }
@@ -462,6 +466,7 @@ function unlockByVideo(key, then) {
   sfx.tick();
   watch({ ...VIDEO_TASK, video: store.task.video, title: t("unlockTitle", { name: keyName(key) }) }, task => {
     store.unlocked = [...new Set([...store.unlocked, key])];
+    notify("video", { video: task.video, via: task.via, unlock: key });
     store.task.watched = [...new Set([...store.task.watched, task.video])];
     store.task.video = pickVideo(videoIds, store.task.watched, task.video);
     save();
@@ -533,7 +538,8 @@ function swipeCut(a, b) {
     onCut: p => stage.splash(p, nW, 26, juice),
   });
   if (hit) {
-    sfx.slice(); buzz("chop");
+    if (glassSound()) sfx.glassCut(); else sfx.slice();
+    buzz("chop");
     sfx.step(game.cutsUsed);                              // swiped cuts climb the scale too
     game.cutsUsed++;
     game.verdictAt = performance.now() + 1300;
@@ -577,7 +583,9 @@ let sheetOpen = null, sheetTab = null;
 // three tabs, each a column of sections: what you cut, how it is cut, and where
 const LOOK_TABS = ["fruit", "cut", "scene"];
 const TAB_ICON = { fruit: "i-fruit", cut: "i-chop", scene: "i-scene" };
-const STYLES = ["free", "dice", "burst"], CAMS = ["top", "front", "close"], NOTES = ["off", "piano", "organ", "musicbox", "marimba"];
+// glass cracks and a shatter (the setting, or "auto" with the glass material), else the knife
+const glassSound = () => store.settings.cutSound === "glass" || (store.settings.cutSound === "auto" && looks.material === "glass");
+const STYLES = ["free", "dice", "burst"], CAMS = ["top", "front", "close"], NOTES = ["off", "piano", "organ", "musicbox", "marimba", "glass"];
 
 function itemName(cat, id) {
   if (cat === "fruit") return FRUITS[id].name[getLang()];
@@ -592,7 +600,7 @@ function itemName(cat, id) {
 function openSheet(kind, tab) {
   sheetOpen = kind; game.holding = false;
   sheetTab = tab || (kind === "looks" ? (sheetTab && LOOK_TABS.includes(sheetTab) ? sheetTab : "fruit") : "settings");
-  $("sheetTitle").textContent = t(kind === "looks" ? "looks" : kind === "tasks" ? "tasks" : "settings");
+  $("sheetTitle").textContent = t(kind === "looks" ? "looks" : kind === "tasks" ? "tasks" : kind === "sound" ? "sound" : "settings");
   const tabs = kind === "looks" ? LOOK_TABS : [];
   $("sheetTabs").hidden = !tabs.length;
   $("sheetTabs").innerHTML = tabs.map(k => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === sheetTab}"><svg><use href="#${TAB_ICON[k]}"/></svg>${t(`tab.${k}`)}</button>`).join("");
@@ -620,17 +628,23 @@ const BOARD_SW = { walnut: "center/cover url(board.jpg)", dark: "center/cover ur
 
 function renderSheet() {
   const B = $("sheetBody");
-  if (sheetOpen === "settings") {
+  if (sheetOpen === "sound") {
     const s = store.settings;
     B.innerHTML = `
       <div class="row-set"><b>${t("sound")}</b><button class="switch" type="button" role="switch" data-sw="sound" aria-checked="${s.sound}" aria-label="${t("sound")}"></button></div>
-      <p class="note" id="lagNote" style="margin:-4px 0 0">${(() => { const l = soundLag(); return l === null ? t("soundLagOff") : t("soundLag", { ms: Math.round(l * 1000) }); })()}</p>
-      <div class="sec"><h3>${t("notes")}</h3><p class="note">${t("notesNote")}</p>${seg("notes", NOTES.map(v => [v, t(`notes.${v}`)]), s.notes)}</div>
+      <p class="note" id="lagNote" style="margin:-4px 0 0;font-size:12px;color:var(--sheet-soft)">${(() => { const l = soundLag(); return l === null ? t("soundLagOff") : t("soundLag", { ms: Math.round(l * 1000) }); })()}</p>
+      <div class="sec"><h3>${t("cutSound")}</h3><p class="note">${t("cutSoundNote")}</p>${seg("cutSound", ["auto", "knife", "glass"].map(v => [v, t(`cutSound.${v}`)]), s.cutSound)}</div>
+      <div class="sec"><h3>${t("notes")}</h3><p class="note">${t("notesNote")}</p>${seg("notes", NOTES.map(v => [v, t(`notes.${v}`)]), s.notes)}</div>`;
+    return;
+  }
+  if (sheetOpen === "settings") {
+    const s = store.settings;
+    B.innerHTML = `
       <div class="row-set"><b>${t("haptics")}</b><button class="switch" type="button" role="switch" data-sw="haptics" aria-checked="${s.haptics}" aria-label="${t("haptics")}"></button></div>
       <div class="sec"><h3>${t("intensity")}</h3><p class="note">${t("hapticsNote")}</p>${seg("strength", [["light", t("light")], ["normal", t("normal")], ["strong", t("strong")]], s.strength)}</div>
       <div class="sec"><h3>${t("quality")}</h3>${seg("quality", [["auto", t("qAuto")], ["battery", t("qBattery")], ["best", t("qBest")]], s.quality)}</div>
       <div class="sec"><h3>${t("language")}</h3>${seg("lang", [["auto", t("langAuto")], ["en", "English"], ["fa", "فارسی"]], s.lang)}</div>
-      <div class="sec"><h3>${t("help")}</h3><p class="help">${t("helpText")}</p></div>`;
+      <div class="sec"><h3>${t("help")}</h3><p class="help">${t("helpText")}</p><p class="note" style="margin:8px 0 0">${t("privacyNote")}</p></div>`;
     return;
   }
   if (sheetOpen === "tasks") {
@@ -733,6 +747,7 @@ $("sheetBody").addEventListener("click", e => {
   if (sheetOpen === "looks") return pick(key, v);
   store.settings[key] = v; save(); applySettings();
   if (key === "notes") sfx.preview();                    // hear the instrument just picked
+  if (key === "cutSound") { if (glassSound()) sfx.glassCut(); else sfx.slice(); }
   if (key === "lang") { openSheet("settings"); if (game.screen === "play") { if (game.mode === "vs") buildVsLayer(); layoutVs(); hud(true); } }
   else renderSheet();
   sfx.tick();
@@ -778,6 +793,7 @@ $("hudCam").onclick = () => {                           // each tap: the next ca
   sfx.tick(); toast(t(`cam.${looks.camera}`), 900);
 };
 $("hudSettings").onclick = () => openSheet("settings");
+$("hudSound").onclick = $("homeSound").onclick = () => openSheet("sound");
 $("backBtn").onclick = () => { sfx.tick(); showHome(); };
 $("retryBtn").onclick = () => { sfx.tick(); resetRound(); };
 $("allBtn").onclick = () => { sfx.tick(); hideResult(); openLevels(); };
@@ -926,6 +942,7 @@ looks.cuts = Math.min(MAX_CUTS, Math.max(1, Math.round(looks.cuts) || 50));   //
 for (const [cat, def] of [["fruit", "orange"], ["knife", "chef"], ["material", "real"], ["board", "walnut"], ["backdrop", "teal"]])
   if (locked(cat, looks[cat])) looks[cat] = def;     // a look chosen before it needed stars or a video
 showHome();
+notifyVisit();
 
 let last = performance.now(), frames = 0, slowFrames = 0;
 stage.renderer.setAnimationLoop(now => {

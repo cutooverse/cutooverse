@@ -32,6 +32,9 @@ export const BOARDS = {
   glass:  { name: { en: "Glass", fa: "شیشه" } },
   classic: { name: { en: "Maple", fa: "افرا" } },
 };
+// the CutooVerse mark engraved in the middle of each board's front edge: its ink and how strong
+const TAG_INK = { walnut: ["#f3dcbc", 0.5], classic: ["#3a2410", 0.5], dark: ["#e8c9a0", 0.42], marble: ["#5c5751", 0.45], glass: ["#ffffff", 0.6] };
+
 // the Blender project's themes: a board, a backdrop and (Halloween) the fruit that goes with it
 export const THEMES = {
   "walnut-teal": { name: { en: "Walnut & teal", fa: "گردو و سبزآبی" }, board: "walnut", backdrop: "teal" },
@@ -111,6 +114,23 @@ export class Stage {
   dressBoard(mesh) {
     const top = this.boardMats[this.boardId], edge = this.edgeMats[this.boardId];
     mesh.material = [edge, edge, top, edge, edge, edge];
+    const [ink, a] = TAG_INK[this.boardId] || TAG_INK.walnut;
+    mesh.userData.tag?.children[0].material.color.set(ink);
+    if (mesh.userData.tag) mesh.userData.tag.children[0].material.opacity = a;
+  }
+
+  // a small mark on the edge that faces the camera, upright however the board is turned
+  makeTag() {
+    this.tagTex ||= brandTexture();
+    const w = 0.062, mark = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4),
+      new THREE.MeshStandardMaterial({ map: this.tagTex, transparent: true, depthWrite: false, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2 }));
+    const tag = new THREE.Group(); tag.add(mark);
+    return tag;
+  }
+  placeTag(sl) {
+    const tag = sl.board.userData.tag;
+    if (sl.rotated) { tag.position.set(-(BOARD.w / 2 + 0.0004), 0, 0); tag.rotation.y = -Math.PI / 2; }   // the short end faces us
+    else { tag.position.set(0, 0, BOARD.d / 2 + 0.0004); tag.rotation.y = 0; }
   }
 
   // n = 1 or 2 boards; two boards sit far apart so each camera only sees its own
@@ -121,6 +141,7 @@ export class Stage {
     for (let i = 0; i < n; i++) {
       const origin = new THREE.Vector3(n === 1 ? 0 : (i === 0 ? -1.4 : 1.4), 0, 0);
       const board = new THREE.Mesh(this.boardGeo, []);
+      board.userData.tag = this.makeTag(); board.add(board.userData.tag);
       this.dressBoard(board);
       board.position.set(origin.x, BOARD.h / 2, origin.z);
       board.castShadow = board.receiveShadow = true;
@@ -170,6 +191,7 @@ export class Stage {
       // the board across the frame, as in the shorts; close: low and near, the fruit large
       sl.rotated = view === "top" && cam.aspect < 0.9;
       sl.board.rotation.y = sl.rotated ? Math.PI / 2 : 0;
+      this.placeTag(sl);
       let off, aim, fov;
       if (view === "front") {
         off = new THREE.Vector3(0, 0.25, 0.62); aim = new THREE.Vector3(0, 0.10, 0);
@@ -284,6 +306,24 @@ export class Stage {
 function fitFov(width, dist, aspect, minV) {
   const v = 2 * Math.atan(Math.tan(Math.atan(width / 2 / dist)) / aspect) * 180 / Math.PI;
   return Math.min(70, Math.max(minV, v));
+}
+
+// the mark: "CutooVerse" in white on clear, tinted by the material; drawn again once Poppins is in
+function brandTexture() {
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 256;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const draw = () => {
+    const g = c.getContext("2d");
+    g.clearRect(0, 0, c.width, c.height);
+    g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = "800 150px Poppins, sans-serif";
+    if ("letterSpacing" in g) g.letterSpacing = "6px";
+    g.fillText("CutooVerse", c.width / 2, c.height / 2 + 6);
+    t.needsUpdate = true;
+  };
+  draw();
+  document.fonts?.load("800 150px Poppins").then(draw, () => {});
+  return t;
 }
 
 // a backdrop's sky: top colour down to the horizon, and a few stars for the night ones

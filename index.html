@@ -97,7 +97,7 @@ body.fa .logo p { letter-spacing: 0; font-size: 15px; }
 #hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
 #hud .bar-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
 #hud .bar-top > * { pointer-events: auto; }
-.bar-top .group { display: flex; gap: 8px; align-items: center; }
+.bar-top .group, .home-top .group { display: flex; gap: 8px; align-items: center; }
 .mode-label { font-weight: 800; font-size: 15px; text-shadow: var(--hud-shadow); }
 .counter { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 66px); transform: translateX(-50%); text-align: center; text-shadow: var(--hud-shadow); display: grid; justify-items: center; gap: 4px; }
 .counter { gap: 6px; }
@@ -302,6 +302,8 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
   <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm2 0h6V8a3 3 0 0 0-6 0z"/></symbol>
   <symbol id="i-cam" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.5-2h5.6l1.5 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.8" r="3.3"/></g></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a7.8 7.8 0 0 1 0 11"/></g></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g></symbol>
   <symbol id="i-looks" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2-.5-1.3.4-2.6 1.8-2.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/></g><circle cx="7.5" cy="11" r="1.4" fill="currentColor"/><circle cx="10.5" cy="7.2" r="1.4" fill="currentColor"/><circle cx="15.2" cy="7.6" r="1.4" fill="currentColor"/></symbol>
@@ -317,7 +319,7 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
 <section id="home" class="pad">
   <div class="home-top">
     <button class="pill" id="homeStars" type="button" aria-label="Stars and tasks"><span class="ico" data-icon="star" style="margin:0"><svg><use href="#i-star"/></svg></span><span id="starsHome">0</span><span class="more" aria-hidden="true">+</span></button>
-    <button class="ib" id="homeSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
+    <span class="group"><button class="ib" id="homeSound" type="button" aria-label="Sound"><svg><use href="#i-sound"/></svg></button><button class="ib" id="homeSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button></span>
   </div>
   <div class="logo"><h1>CUTOO<span>VERSE</span></h1><p data-t="tagline"></p></div>
   <div>
@@ -326,7 +328,7 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
       <button class="mode" data-mode="chop" type="button"><span class="ic" data-icon="mode-chop"><svg><use href="#i-chop"/></svg></span><b data-t="mode.chop"></b></button>
       <button class="mode" data-mode="levels" type="button"><span class="ic" data-icon="mode-puzzle"><svg><use href="#i-target"/></svg></span><b data-t="mode.levels"></b></button>
       <button class="mode" data-mode="free" type="button"><span class="ic" data-icon="mode-free"><svg><use href="#i-swipe"/></svg></span><b data-t="mode.free"></b></button>
-      <button class="mode" id="homeLooks" type="button"><span class="ic" data-icon="looks"><svg><use href="#i-looks"/></svg></span><b data-t="looks"></b></button>
+      <button class="mode" id="homeLooks" type="button"><span class="ic" data-icon="customize"><svg><use href="#i-looks"/></svg></span><b data-t="looks"></b></button>
     </nav>
   </div>
 </section>
@@ -340,7 +342,8 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
     </div>
     <div class="group">
       <button class="ib" id="hudCam" type="button" aria-label="Camera" data-icon="camera"><svg><use href="#i-cam"/></svg></button>
-      <button class="ib" id="hudLooks" type="button" aria-label="Looks" data-icon="looks"><svg><use href="#i-looks"/></svg></button>
+      <button class="ib" id="hudSound" type="button" aria-label="Sound"><svg><use href="#i-sound"/></svg></button>
+      <button class="ib" id="hudLooks" type="button" aria-label="Customize" data-icon="customize"><svg><use href="#i-looks"/></svg></button>
       <button class="ib" id="hudSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
     </div>
   </div>
@@ -411,6 +414,14 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
   </div>
 </section>
 
+<script>
+  // Vercel Web Analytics (visitor counts in the Vercel dashboard): only on the real site, the file
+  // does not exist on serve.py
+  if (!/^(localhost|127\.0\.0\.1|192\.168\.)/.test(location.hostname)) {
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    const s = document.createElement("script"); s.defer = true; s.src = "/_vercel/insights/script.js"; document.head.appendChild(s);
+  }
+</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",

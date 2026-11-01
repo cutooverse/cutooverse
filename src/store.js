@@ -2,7 +2,7 @@
 const KEY = "cutcount.v1";
 const DEFAULTS = {
   looks: { fruit: "orange", material: "real", knife: "chef", cuts: 50, size: "m", board: "walnut", backdrop: "teal", style: "free", camera: "top", speed: "normal" },
-  settings: { sound: true, notes: "piano", haptics: true, strength: "normal", quality: "auto", lang: "auto" },
+  settings: { sound: true, cutSound: "auto", notes: "piano", haptics: true, strength: "normal", quality: "auto", lang: "auto" },
   stars: [],
   unlocked: [],                               // what videos opened ("knife.gold", "level.3")
   best: {},                                   // the most pieces, by "fruit|style|cuts"
