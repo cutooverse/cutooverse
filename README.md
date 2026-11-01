@@ -1,4 +1,4 @@
-# cutooverse
+# CutooVerse
 
 A slicing game that runs entirely in the browser: three.js for the picture, Rapier for the
 physics, no server and no build step.

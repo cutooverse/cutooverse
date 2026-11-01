@@ -1,4 +1,4 @@
-# Cut Count icons
+# CutooVerse icons
 
 Put each finished PNG in this folder (`cutgame/icons/`) under the file name in the table. The game
 picks it up by itself on the next reload and drops the drawn icon it uses now. A missing file is
@@ -14,7 +14,7 @@ Use this block for every icon and fill in the three fields at the top from the t
   "icon_description": "",
   "color_hint": "",
 
-  "task": "Generate a single 3D icon of the object described by icon_name and icon_description, for a playful but premium mobile slicing game called Cut Count.",
+  "task": "Generate a single 3D icon of the object described by icon_name and icon_description, for a playful but premium mobile slicing game called CutooVerse.",
 
   "output": {
     "format": "PNG",
@@ -52,7 +52,7 @@ Use this block for every icon and fill in the three fields at the top from the t
   "color_system": {
     "instruction": "Use color_hint when provided. Every icon must belong to the same family and read clearly on dark teal and on warm off-white.",
     "palette": {
-      "brand_accent": "Cut Count red #FF4136, the red of the 'N Cuts' titles. Dominant only on the main play icons.",
+      "brand_accent": "CutooVerse red #FF4136, the red of the 'N Cuts' titles. Dominant only on the main play icons.",
       "supporting": [
         "warm off-white #F2F1EE",
         "juicy orange #FF8A1A",
@@ -101,7 +101,7 @@ Use this block for every icon and fill in the three fields at the top from the t
     "No photorealistic materials, no sharp corners or thin fragile parts."
   ],
 
-  "quality_goal": "A polished, juicy 3D icon that sits naturally on dark teal glass cards and on a warm off-white panel, one family with the other Cut Count icons."
+  "quality_goal": "A polished, juicy 3D icon that sits naturally on dark teal glass cards and on a warm off-white panel, one family with the other CutooVerse icons."
 }
 ```
 

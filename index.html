@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Cut Count</title>
+<title>CutooVerse</title>
+<meta name="application-name" content="CutooVerse">
+<meta name="apple-mobile-web-app-title" content="CutooVerse">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -98,10 +100,13 @@ body.fa .logo p { letter-spacing: 0; font-size: 15px; }
 .bar-top .group { display: flex; gap: 8px; align-items: center; }
 .mode-label { font-weight: 800; font-size: 15px; text-shadow: var(--hud-shadow); }
 .counter { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 66px); transform: translateX(-50%); text-align: center; text-shadow: var(--hud-shadow); display: grid; justify-items: center; gap: 4px; }
-.counter .big { font-weight: 900; font-size: clamp(46px, 12vw, 72px); line-height: 1; font-variant-numeric: tabular-nums; }
-.counter .sub { font-weight: 700; font-size: 15px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.progress { width: 120px; height: 4px; border-radius: 4px; background: var(--glass-hi); overflow: hidden; }
-.progress i { display: block; height: 100%; width: 100%; background: var(--ink); border-radius: 4px; transform: scaleX(0); transform-origin: left; transition: transform .08s linear; }
+.counter { gap: 6px; }
+.counter .big { font-weight: 800; font-size: 13px; letter-spacing: .04em; color: var(--ink-soft); line-height: 1; font-variant-numeric: tabular-nums; }
+.counter .sub { font-weight: 800; font-size: 15px; color: var(--ink-soft); font-variant-numeric: tabular-nums; transition: font-size .25s, color .25s; }
+.counter.done .sub { font-size: 30px; font-weight: 900; color: var(--ink); }   /* the count is the point: big once it falls apart */
+.counter.free .progress { display: none; }
+.progress { width: min(220px, 56vw); height: 6px; border-radius: 6px; background: var(--glass-hi); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.progress i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--ink-soft), var(--ink)); border-radius: 6px; transform: scaleX(0); transform-origin: left; transition: transform .08s linear; }
 [dir="rtl"] .progress i { transform-origin: right; }
 .pop { animation: pop .35s ease-out; }
 @keyframes pop { 40% { transform: scale(1.16); } }
@@ -160,6 +165,11 @@ body.fa .vs-badge { font-size: 12px; }
 .lv .st svg { width: 14px; height: 14px; color: #ddd5c4; }
 .lv .st svg.on { color: #f0ae17; }
 .lv.lock { opacity: .45; }
+.lv.video { border: 1.5px dashed #ff0033; }
+.lv .pv { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 800; color: #ff0033; }
+.lv .pv svg { width: 12px; height: 12px; }
+.tile .lock.video { background: #ff0033; color: #fff; padding: 4px 6px; }
+.tile .lock.video svg { color: #fff; }
 .lv.lock svg.lk { width: 22px; height: 22px; color: var(--sheet-soft); }
 .lv:not(.lock):active { transform: scale(0.96); }
 
@@ -170,6 +180,15 @@ body.fa .vs-badge { font-size: 12px; }
 #sheet.open .panel { transform: none; }
 #scrim { position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity .3s; }
 #scrim.open { opacity: 1; pointer-events: auto; }
+#scrim.clear { background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.18)); }
+#sheet.looks .panel { max-height: min(56vh, 560px); }
+.strip { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none;
+  margin: 0 -16px; padding: 3px 16px 6px; scroll-padding-inline: 16px; }
+.strip::-webkit-scrollbar { display: none; }
+.sheet-body > *, .sec { min-width: 0; }            /* a row of cards scrolls; it must not widen the sheet */
+#home, #hud { transition: opacity .25s; }
+body.looking #home, body.looking #hud { opacity: 0; pointer-events: none; }   /* Looks: only the preview above the sheet */
+.strip .tile { flex: 0 0 96px; scroll-snap-align: start; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 8px; }
 .sheet-head h2 { margin: 0; font-size: 22px; font-weight: 900; }
 .sheet-head .done { padding: 9px 16px; border-radius: 999px; background: var(--sheet-ink); color: var(--sheet); font-weight: 800; font-size: 14px; }
@@ -182,6 +201,7 @@ body.fa .vs-badge { font-size: 12px; }
 .sec h3 em { font-style: normal; margin-inline-start: 8px; color: var(--cut); letter-spacing: 0; text-transform: none; }
 .sec + .sec, .pair + .sec { border-top: 1px solid var(--sheet-line); padding-top: 14px; }
 .pair { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; }
+.pair .sec { border-top: 0; padding-top: 0; }
 .pair .seg { flex-wrap: nowrap; }
 .pair .seg button { padding: 9px 4px; font-size: 12.5px; }
 .seg .lk { width: 12px; height: 12px; margin-inline-start: 4px; vertical-align: -1px; color: var(--gold); }
@@ -276,6 +296,7 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
   <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.6l2.9 6 6.5.8-4.8 4.5 1.2 6.5L12 17.3 6.2 20.4l1.2-6.5L2.6 9.4l6.5-.8z"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm2 0h6V8a3 3 0 0 0-6 0z"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.5-2h5.6l1.5 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.8" r="3.3"/></g></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g></symbol>
   <symbol id="i-looks" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2-.5-1.3.4-2.6 1.8-2.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/></g><circle cx="7.5" cy="11" r="1.4" fill="currentColor"/><circle cx="10.5" cy="7.2" r="1.4" fill="currentColor"/><circle cx="15.2" cy="7.6" r="1.4" fill="currentColor"/></symbol>
@@ -293,7 +314,7 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
     <button class="pill" id="homeStars" type="button" aria-label="Stars and tasks"><span class="ico" data-icon="star" style="margin:0"><svg><use href="#i-star"/></svg></span><span id="starsHome">0</span><span class="more" aria-hidden="true">+</span></button>
     <button class="ib" id="homeSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
   </div>
-  <div class="logo"><h1>CUT<span>COUNT</span></h1><p data-t="tagline"></p></div>
+  <div class="logo"><h1>CUTOO<span>VERSE</span></h1><p data-t="tagline"></p></div>
   <div>
     <p class="home-hint"><svg><use href="#i-chop"/></svg><span data-t="homeHint"></span></p>
     <nav class="modes">
@@ -313,11 +334,12 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
       <span class="mode-label" id="modeLabel"></span>
     </div>
     <div class="group">
+      <button class="ib" id="hudCam" type="button" aria-label="Camera" data-icon="camera"><svg><use href="#i-cam"/></svg></button>
       <button class="ib" id="hudLooks" type="button" aria-label="Looks" data-icon="looks"><svg><use href="#i-looks"/></svg></button>
       <button class="ib" id="hudSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
     </div>
   </div>
-  <div class="counter" id="chopCounter" hidden><div class="big" id="chopBig">0/50</div><div class="progress"><i id="chopBar"></i></div><div class="sub" id="chopSub"></div></div>
+  <div class="counter" id="chopCounter" hidden><div class="progress"><i id="chopBar"></i></div><div class="big" id="chopBig">0/50</div><div class="sub" id="chopSub"></div></div>
   <div class="goal pad" id="goal" hidden>
     <div><div class="eyebrow" id="levelLabel"></div><div class="line" id="goalLine"></div></div>
     <div><div class="eyebrow" id="cutsLabel"></div><div class="knives" id="knives"></div></div>

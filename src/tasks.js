@@ -1,9 +1,12 @@
-// The "watch a video" task, always there: a video picked at random from videos.txt (one YouTube
-// link a line). It is done after `seconds` of it have played: in the game's own player (YouTube's
-// IFrame API), or, where that does not load, on YouTube with the time spent away.
-import { t, getLang } from "./i18n.js";
+// Video tasks: some looks and Puzzle levels open only after watching a video, a random one from
+// videos.txt (one YouTube link a line). A video counts after `seconds` of it have played: in the
+// game's own player (YouTube's IFrame API), or, where that does not load, on YouTube with the time
+// spent away.
+import { t } from "./i18n.js";
 
-export const VIDEO_TASK = { seconds: 30, reward: 3, name: { en: "Watch a video", fa: "دیدن یک ویدیو" } };
+export const VIDEO_TASK = { seconds: 10 };
+// what a video unlocks: "category.id" as in the Looks, or "level.N" for Puzzle level N + 1
+export const VIDEO_UNLOCK = ["knife.gold", "fruit.pineapple", "fruit.coconut", "fruit.dragonfruit", "fruit.bamboo", "level.3", "level.6"];
 
 // the 11-character video id from any YouTube link (watch?v=, youtu.be/, shorts/, embed/, live/) or a bare id
 export function videoId(line) {
@@ -43,7 +46,7 @@ function loadYT() {                                    // the IFrame API, once; 
 export function watch(task, onDone) {
   current = { task, onDone, watched: 0, done: false };
   $("video").hidden = false;
-  $("videoTitle").textContent = task.name[getLang()];
+  $("videoTitle").textContent = task.title;
   $("videoFail").hidden = true;
   $("videoBox").innerHTML = '<div id="videoPlayer"></div>';
   progress();
@@ -93,7 +96,7 @@ function finish() {
 function progress() {
   const { task, watched, done } = current, left = Math.max(0, Math.ceil(task.seconds - watched));
   $("videoBar").style.transform = `scaleX(${Math.min(1, watched / task.seconds)})`;
-  $("videoNote").textContent = done ? t("earned", { n: task.reward }) : t("keepWatching", { s: left, n: task.reward });
+  $("videoNote").textContent = done ? t("earned") : t("keepWatching", { s: left });
   $("videoNote").classList.toggle("win", done);
 }
 
@@ -105,4 +108,4 @@ $("videoClose").onclick = () => {
   $("video").hidden = true;
 };
 
-export const taskLine = () => t("watchFor", { s: VIDEO_TASK.seconds, n: VIDEO_TASK.reward });
+export const taskLine = () => t("watchFor", { s: VIDEO_TASK.seconds });

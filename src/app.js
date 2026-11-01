@@ -11,7 +11,7 @@ import { Burst, countPieces } from "./burst.js";
 import { sfx, buzz, sound, unlock, audioLead, soundLag } from "./sound.js";
 import { t, num, setLang, getLang } from "./i18n.js";
 import { store, save, totalStars } from "./store.js";
-import { VIDEO_TASK, watch, taskLine, videoList, pickVideo } from "./tasks.js";
+import { VIDEO_TASK, VIDEO_UNLOCK, watch, taskLine, videoList, pickVideo } from "./tasks.js";
 import { fruitThumb, knifeThumb, forgetThumbs } from "./thumbs.js";
 
 const $ = id => document.getElementById(id);
@@ -21,7 +21,8 @@ const SIZES = { s: 0.75, m: 1, l: 1.3 };
 const MAX_CUTS = 100;                        // the cuts slider, and how long Free style can go on
 const LEVELS = [[2, 1], [4, 2], [3, 2], [6, 3], [7, 3], [8, 3], [10, 4], [12, 4], [15, 5]];
 const MIN_PIECE = 0.004;                     // crumbs under 0.4 % of the fruit are not counted
-const UNLOCK = { "material.glass": 6, "knife.cleaver": 2, "knife.gold": 12, "board.marble": 3, "board.glass": 9, "backdrop.night": 4, "theme.halloween": 4 };
+// stars needed (one per Puzzle level, nine in all); the things a video opens are in tasks.js
+const UNLOCK = { "knife.cleaver": 2, "board.marble": 3, "backdrop.night": 4, "theme.halloween": 4, "material.glass": 6, "board.glass": 8 };
 const REAL_SLICE_MAX = 12;                   // up to this many chops the fruit is always really cut,
 // and so is any that makes up to perf.realPieces pieces (300, 120 on phones); above, it bursts into cubes
 
@@ -68,7 +69,8 @@ function applySettings() {
   $("starsHome").textContent = num(totalStars());
 }
 
-const locked = (cat, id) => (UNLOCK[`${cat}.${id}`] || 0) > totalStars();
+const needsVideo = (cat, id) => VIDEO_UNLOCK.includes(`${cat}.${id}`) && !store.unlocked.includes(`${cat}.${id}`);
+const locked = (cat, id) => needsVideo(cat, id) || (UNLOCK[`${cat}.${id}`] || 0) > totalStars();
 
 // ------------------------------------------------------------------ slots: one fruit, its knife, its chops
 function newSlot(i, total) {
@@ -329,7 +331,8 @@ function hud(force = false) {
     key = `${s0.made}|${s0.total}|${s0.shown}|${done}|${looks.style}|${getLang()}`;
     if (key === lastHud && !force) return;
     const free = looks.style === "free";
-    $("chopBig").textContent = free ? num(s0.made) : `${num(s0.made)}/${num(s0.total)}`;
+    $("chopCounter").classList.toggle("free", free); $("chopCounter").classList.toggle("done", done);
+    $("chopBig").textContent = free ? `${num(s0.made)} ${t(s0.made === 1 ? "cut" : "cuts")}` : `${num(s0.made)} / ${num(s0.total)}`;
     $("chopBar").style.transform = `scaleX(${s0.made / s0.total})`;
     $("chopSub").textContent = `${num(s0.shown)} ${t(s0.shown === 1 ? "piece" : "pieces")}`;
     setHint(done ? t("tapNew") : t(free ? "holdFree" : "hold"), !done && s0.made === 0);
@@ -405,7 +408,7 @@ function verdict() {
   game.tries++;
   let stars = 0;
   if (win) {
-    stars = game.tries <= 1 ? 3 : game.tries === 2 ? 2 : 1;
+    stars = 1;
     const before = totalStars();
     store.stars[game.levelIdx] = Math.max(store.stars[game.levelIdx] || 0, stars);
     save();
@@ -413,7 +416,7 @@ function verdict() {
     sfx.win(); buzz("burst");
   } else sfx.lose();
   $("result").classList.toggle("win", win);
-  $("resultStars").innerHTML = win ? [0, 1, 2].map(i => `<svg class="${i < stars ? "on" : ""}" style="animation-delay:${i * 0.12}s"><use href="#i-star"/></svg>`).join("") : "";
+  $("resultStars").innerHTML = win ? `<svg class="on"><use href="#i-star"/></svg>` : "";
   $("resultTitle").textContent = win ? (game.cutsUsed < cuts ? t("clearedSpare") : t("cleared")) : n > target ? t("tooMany") : t("tooFew");
   $("resultText").textContent = win ? t("resultWin", { n, c: game.cutsUsed }) : t("resultLose", { n, t: target });
   $("nextBtn").hidden = !win;
@@ -437,17 +440,21 @@ videoList().then(ids => {
   if (sheetOpen === "tasks") renderSheet();
 });
 
-// the task's stars, then the unlocks they bring, and the next video
-function taskDone(task) {
-  const before = totalStars();
-  store.task.stars += task.reward;
-  store.task.watched = [...new Set([...store.task.watched, task.video])];
-  store.task.video = pickVideo(videoIds, store.task.watched, task.video);
-  save();
-  $("starsHome").textContent = num(totalStars());
-  announceUnlocks(before, totalStars());
-  sfx.win(); buzz("burst");
-  if (sheetOpen === "tasks") renderSheet();
+// a video opens one thing (a look, or a Puzzle level); then the tasks move on to another video
+const keyName = key => { const [cat, id] = key.split("."); return cat === "level" ? t("level", { n: Number(id) + 1 }) : itemName(cat, id); };
+function unlockByVideo(key, then) {
+  if (!store.task.video) { toast(t("noVideos")); sfx.lose(); return; }
+  sfx.tick();
+  watch({ ...VIDEO_TASK, video: store.task.video, title: t("unlockTitle", { name: keyName(key) }) }, task => {
+    store.unlocked = [...new Set([...store.unlocked, key])];
+    store.task.watched = [...new Set([...store.task.watched, task.video])];
+    store.task.video = pickVideo(videoIds, store.task.watched, task.video);
+    save();
+    sfx.win(); buzz("burst"); toast(t("unlocked", { name: keyName(key) }));
+    if (sheetOpen) renderSheet();
+    if (!$("levels").hidden) openLevels();
+    then?.();
+  });
 }
 
 function hideResult() { $("result").classList.remove("show", "win"); }
@@ -455,11 +462,11 @@ function hideResult() { $("result").classList.remove("show", "win"); }
 function openLevels() {
   const grid = $("levelsGrid");
   grid.innerHTML = LEVELS.map((lv, i) => {
-    const open = i === 0 || (store.stars[i - 1] || 0) > 0 || (store.stars[i] || 0) > 0;
-    const st = store.stars[i] || 0;
-    return open
-      ? `<button class="lv" type="button" data-lv="${i}"><b>${num(i + 1)}</b><span class="st">${[0, 1, 2].map(k => `<svg class="${k < st ? "on" : ""}"><use href="#i-star"/></svg>`).join("")}</span></button>`
-      : `<div class="lv lock"><svg class="lk"><use href="#i-lock"/></svg></div>`;
+    const cleared = (store.stars[i] || 0) > 0, reached = i === 0 || (store.stars[i - 1] || 0) > 0 || cleared;
+    if (!reached) return `<div class="lv lock"><svg class="lk"><use href="#i-lock"/></svg></div>`;
+    if (!cleared && needsVideo("level", i))            // reached, but this one opens with a video
+      return `<button class="lv video" type="button" data-lvvideo="${i}"><b>${num(i + 1)}</b><span class="pv"><svg><use href="#i-play"/></svg>${t("watchShort")}</span></button>`;
+    return `<button class="lv" type="button" data-lv="${i}"><b>${num(i + 1)}</b><span class="st"><svg class="${cleared ? "on" : ""}"><use href="#i-star"/></svg></span></button>`;
   }).join("");
   $("levels").hidden = false;
 }
@@ -573,17 +580,21 @@ function openSheet(kind, tab) {
   const tabs = kind === "looks" ? LOOK_TABS : [];
   $("sheetTabs").hidden = !tabs.length;
   $("sheetTabs").innerHTML = tabs.map(k => `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${k === sheetTab}"><svg><use href="#${TAB_ICON[k]}"/></svg>${t(`tab.${k}`)}</button>`).join("");
-  renderSheet();
+  $("sheetBody").innerHTML = ""; renderSheet();    // a fresh open: rows start at the chosen card
   $("sheet").classList.add("open"); $("scrim").classList.add("open");
+  $("sheet").classList.toggle("looks", kind === "looks"); $("scrim").classList.toggle("clear", kind === "looks");
+  stage.liftTo = kind === "looks" && game.slots.length === 1 ? 0.25 : 0;   // see each pick on the board above
+  document.body.classList.toggle("looking", kind === "looks");
   sfx.tick();
 }
-function closeSheet() { sheetOpen = null; $("sheet").classList.remove("open"); $("scrim").classList.remove("open"); }
+function closeSheet() { sheetOpen = null; stage.liftTo = 0; document.body.classList.remove("looking"); $("sheet").classList.remove("open"); $("scrim").classList.remove("open"); }
 
 function tile(cat, id, label, img, swatch) {
   const lock = locked(cat, id), on = cat === "theme" ? themeOn(id) : looks[cat] === id;
   const pic = img ? `<img alt="" src="${img}">` : `<i class="sw" style="${swatch}"></i>`;
   return `<button class="tile${lock ? " locked" : ""}" type="button" data-pick="${cat}" data-id="${id}" aria-pressed="${on}">
-    ${pic}<span>${label}</span>${lock ? `<em class="lock"><svg><use href="#i-lock"/></svg>${num(UNLOCK[`${cat}.${id}`])}</em>` : ""}</button>`;
+    ${pic}<span>${label}</span>${!lock ? "" : needsVideo(cat, id) ? `<em class="lock video"><svg><use href="#i-play"/></svg></em>`
+      : `<em class="lock"><svg><use href="#i-lock"/></svg>${num(UNLOCK[`${cat}.${id}`])}</em>`}</button>`;
 }
 const seg = (key, opts, cur) => `<div class="seg" data-seg="${key}">${opts.map(([v, label]) => `<button type="button" data-v="${v}" aria-pressed="${String(cur) === String(v)}">${label}</button>`).join("")}</div>`;
 
@@ -606,30 +617,32 @@ function renderSheet() {
     return;
   }
   if (sheetOpen === "tasks") {
+    const waiting = VIDEO_UNLOCK.filter(k => { const [cat, id] = k.split("."); return needsVideo(cat, id); });
+    const v = store.task.video;                        // its thumbnail, over the play icon if YouTube's pictures load
+    const thumb = `<span class="tic"><svg><use href="#i-play"/></svg>${v ? `<img alt="" src="https://i.ytimg.com/vi/${v}/mqdefault.jpg" onerror="this.remove()">` : ""}</span>`;
     B.innerHTML = `
-      <div class="sec"><h3>${t("yourStars")}<em>★ ${num(totalStars())}</em></h3><p class="help">${t("starsHelp")}</p></div>
-      <div class="sec"><h3>${t("tasks")}</h3><div class="tasklist">${(() => {
-        const v = store.task.video;                    // its thumbnail, over the play icon if YouTube's pictures load
-        return `<div class="task${v ? "" : " done"}"><span class="tic"><svg><use href="#i-play"/></svg>${v ? `<img alt="" src="https://i.ytimg.com/vi/${v}/mqdefault.jpg" onerror="this.remove()">` : ""}</span>
-          <div><b>${VIDEO_TASK.name[getLang()]}</b><small>${v ? taskLine() : t("noVideos")}</small>${store.task.watched.length ? `<small class="seen">${t("watchedN", { n: store.task.watched.length })}</small>` : ""}</div>
-          ${v ? `<button class="go" type="button" data-task>${t("watch")}</button>` : ""}
-        </div>`;
-      })()}</div></div>`;
+      <div class="sec"><h3>${t("yourStars")}<em>★ ${num(totalStars())} / ${num(LEVELS.length)}</em></h3><p class="help">${t("starsHelp")}</p></div>
+      <div class="sec"><h3>${t("tasks")}<em>${num(waiting.length)}</em></h3><p class="note">${t("tasksNote", { s: VIDEO_TASK.seconds })}</p>
+        <div class="tasklist">${waiting.length ? waiting.map(k => `
+          <div class="task">${thumb}<div><b>${keyName(k)}</b><small>${k.startsWith("level.") ? t("mode.levels") : t(`tab.${k.split(".")[0]}`)} · ${v ? taskLine() : t("noVideos")}</small></div>
+            ${v ? `<button class="go" type="button" data-task="${k}">${t("watch")}</button>` : ""}</div>`).join("")
+          : `<p class="help">${t("allUnlocked")}</p>`}</div></div>`;
     return;
   }
   const L = getLang();
   // a section: its name, what is chosen in it now, then the choices
   const sec = (key, now, body, note = "") => `<section class="sec" data-sec="${key}"><h3>${t(`tab.${key}`)}<em${key === "cuts" ? ' id="cutsNow"' : ""}>${now || ""}</em></h3>${note ? `<p class="note">${note}</p>` : ""}${body}</section>`;
-  const tiles = list => `<div class="tiles">${list.join("")}</div>`;
+  const tiles = list => `<div class="strip">${list.join("")}</div>`;   // one row, swiped sideways
   const th = Object.keys(THEMES).find(themeOn);
   let html = "";
-  if (sheetTab === "fruit") html = `<div class="pair">
-      ${sec("size", t(`size.${looks.size}`), seg("size", [["s", t("size.s")], ["m", t("size.m")], ["l", t("size.l")]], looks.size))}
-      ${sec("material", t(`mat.${looks.material}`), seg("material", ["real", "glass"].map(id => [id, `${t(`mat.${id}`)}${locked("material", id) ? '<svg class="lk"><use href="#i-lock"/></svg>' : ""}`]), looks.material))}
-    </div>
+  if (sheetTab === "fruit") html = `
     ${sec("fruit", itemName("fruit", looks.fruit), tiles([...FRUIT_IDS.map(id => tile("fruit", id, FRUITS[id].name[L], fruitThumb(id))),
       FRUITS.photo ? tile("fruit", "photo", FRUITS.photo.name[L], photoSaved?.img) : "",
-      `<button class="tile add" type="button" data-addphoto><i class="sw" data-icon="add-photo">+</i><span>${t("addPhoto")}</span></button>`]))}`;
+      `<button class="tile add" type="button" data-addphoto><i class="sw" data-icon="add-photo">+</i><span>${t("addPhoto")}</span></button>`]))}
+    <div class="pair">
+      ${sec("size", t(`size.${looks.size}`), seg("size", [["s", t("size.s")], ["m", t("size.m")], ["l", t("size.l")]], looks.size))}
+      ${sec("material", t(`mat.${looks.material}`), seg("material", ["real", "glass"].map(id => [id, `${t(`mat.${id}`)}${locked("material", id) ? '<svg class="lk"><use href="#i-lock"/></svg>' : ""}`]), looks.material))}
+    </div>`;
   if (sheetTab === "cut") html = `
     ${sec("style", t(`style.${looks.style}`), seg("style", STYLES.map(v => [v, `<span class="ico" data-icon="style-${v}"></span>${t(`style.${v}`)}`]), looks.style), t(`style.${looks.style}.d`))}
     ${sec("speed", t(`speed.${looks.speed}`), seg("speed", SPEEDS.map(v => [v, t(`speed.${v}`)]), looks.speed))}
@@ -644,11 +657,18 @@ function renderSheet() {
     ${sec("camera", t(`cam.${looks.camera}`), seg("camera", CAMS.map(v => [v, `<span class="ico" data-icon="cam-${v}"></span>${t(`cam.${v}`)}`]), looks.camera), t(`cam.${looks.camera}.d`))}
     ${sec("board", itemName("board", looks.board), tiles(Object.keys(BOARDS).map(id => tile("board", id, BOARDS[id].name[L], null, `background:${BOARD_SW[id]}`))))}
     ${sec("backdrop", itemName("backdrop", looks.backdrop), tiles(Object.entries(BACKDROPS).map(([id, b]) => tile("backdrop", id, b.name[L], null, `background:linear-gradient(180deg,${b.bg} 55%,${b.floor} 55%)`))))}`;
+  const keep = [...B.querySelectorAll(".strip")].map(st => st.scrollLeft);   // a pick re-draws: rows stay where they were
   B.innerHTML = html;
   applyIcons(B);
+  B.querySelectorAll(".strip").forEach((st, i) => {
+    if (keep.length) { st.scrollLeft = keep[i] || 0; return; }
+    const on = st.querySelector('[aria-pressed="true"]');             // a new tab: the chosen card in view
+    if (on) st.scrollLeft += on.getBoundingClientRect().left - st.getBoundingClientRect().left - (st.clientWidth - on.offsetWidth) / 2;
+  });
 }
 
 function pick(cat, id) {
+  if (needsVideo(cat, id)) return unlockByVideo(`${cat}.${id}`, () => pick(cat, id));
   if (locked(cat, id)) { toast(t("unlockWith", { n: UNLOCK[`${cat}.${id}`] })); sfx.lose(); return; }
   sfx.tick();
   if (cat === "cuts") looks.cuts = Number(id);
@@ -674,12 +694,18 @@ $("sheetTabs").addEventListener("click", e => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
   sheetTab = b.dataset.tab;
   $("sheetTabs").querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === b));
-  sfx.tick(); renderSheet(); $("sheetBody").scrollTop = 0;
+  sfx.tick(); $("sheetBody").innerHTML = ""; renderSheet(); $("sheetBody").scrollTop = 0;
 });
+// a mouse wheel moves a row of cards sideways
+$("sheetBody").addEventListener("wheel", e => {
+  const st = e.target.closest(".strip");
+  if (!st || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || st.scrollWidth <= st.clientWidth) return;
+  st.scrollLeft += (document.documentElement.dir === "rtl" ? -1 : 1) * e.deltaY; e.preventDefault();
+}, { passive: false });
 $("sheetBody").addEventListener("click", e => {
   if (e.target.closest("[data-addphoto]")) { $("photoFile").value = ""; $("photoFile").click(); return; }
   const tk = e.target.closest("[data-task]");
-  if (tk) { sfx.tick(); watch({ ...VIDEO_TASK, video: store.task.video }, taskDone); return; }
+  if (tk) return unlockByVideo(tk.dataset.task);
   const tl = e.target.closest("[data-pick]");
   if (tl) return pick(tl.dataset.pick, tl.dataset.id);
   const sw = e.target.closest("[data-sw]");
@@ -705,9 +731,9 @@ $("sheetDone").onclick = closeSheet;
 $("scrim").onclick = closeSheet;
 
 let toastTimer = 0;
-function toast(text) {
+function toast(text, ms = 2200) {
   const el = $("toast"); el.textContent = text; el.classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), ms);
 }
 
 // ------------------------------------------------------------------ buttons
@@ -716,6 +742,8 @@ document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click"
   if (b.dataset.mode === "levels") openLevels(); else startMode(b.dataset.mode);
 }));
 $("levelsGrid").addEventListener("click", e => {
+  const v = e.target.closest("[data-lvvideo]");
+  if (v) return unlockByVideo(`level.${v.dataset.lvvideo}`);
   const b = e.target.closest("[data-lv]"); if (!b) return;
   sfx.tick(); $("levels").hidden = true;
   game.levelIdx = Number(b.dataset.lv); game.tries = 0;
@@ -726,11 +754,21 @@ $("homeLooks").onclick = () => openSheet("looks");
 $("homeSettings").onclick = () => openSheet("settings");
 $("homeStars").onclick = () => openSheet("tasks");
 $("hudLooks").onclick = () => openSheet("looks");
+$("hudCam").onclick = () => {                           // each tap: the next camera, nothing to open
+  looks.camera = CAMS[(CAMS.indexOf(looks.camera) + 1) % CAMS.length]; save();
+  stage.camView = looks.camera; stage.resize(); layoutVs();
+  sfx.tick(); toast(t(`cam.${looks.camera}`), 900);
+};
 $("hudSettings").onclick = () => openSheet("settings");
 $("backBtn").onclick = () => { sfx.tick(); showHome(); };
 $("retryBtn").onclick = () => { sfx.tick(); resetRound(); };
 $("allBtn").onclick = () => { sfx.tick(); hideResult(); openLevels(); };
-$("nextBtn").onclick = () => { sfx.tick(); game.levelIdx = (game.levelIdx + 1) % LEVELS.length; game.tries = 0; resetRound(); };
+$("nextBtn").onclick = () => {
+  sfx.tick();
+  const next = (game.levelIdx + 1) % LEVELS.length;
+  if (needsVideo("level", next) && !(store.stars[next] > 0)) { hideResult(); openLevels(); return unlockByVideo(`level.${next}`); }
+  game.levelIdx = next; game.tries = 0; resetRound();
+};
 
 // ------------------------------------------------------------------ frame loop
 function resize() {
@@ -867,6 +905,8 @@ resize();
 await restorePhoto();
 if (looks.fruit === "photo" && !FRUITS.photo) { looks.fruit = "orange"; save(); }
 looks.cuts = Math.min(MAX_CUTS, Math.max(1, Math.round(looks.cuts) || 50));   // older saves could hold 250
+for (const [cat, def] of [["fruit", "orange"], ["knife", "chef"], ["material", "real"], ["board", "walnut"], ["backdrop", "teal"]])
+  if (locked(cat, looks[cat])) looks[cat] = def;     // a look chosen before it needed stars or a video
 showHome();
 
 let last = performance.now(), frames = 0, slowFrames = 0;

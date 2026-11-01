@@ -77,6 +77,7 @@ export class Stage {
     this.slots = [];
     this.cameras = [];
     this.quality = "auto";
+    this.lift = 0; this.liftTo = 0;                    // share of the height the picture is moved up (Looks open)
     this.dropsInit();
     this.setLayout(1);
   }
@@ -169,6 +170,7 @@ export class Stage {
         off = new THREE.Vector3(0, 0.34, 0.54); aim = new THREE.Vector3(0, 0.045, 0); fov = n === 2 && !wide ? 30 : 38;
       }
       cam.fov = fov;
+      if (this.lift) cam.setViewOffset(r.w, r.h, 0, this.lift * r.h, r.w, r.h);
       cam.position.copy(sl.origin).add(off);
       cam.lookAt(aim.add(sl.origin));
       cam.updateProjectionMatrix();
@@ -203,8 +205,14 @@ export class Stage {
   render(shake = 0) {
     const R = this.renderer, H = innerHeight;
     R.setScissorTest(this.slots.length > 1);
+    const was = this.lift;
+    this.lift += (this.liftTo - this.lift) * 0.16;
+    if (Math.abs(this.liftTo - this.lift) < 0.001) this.lift = this.liftTo;
     this.slots.forEach((sl, i) => {
       const r = sl.rect, cam = this.cameras[i];
+      if (this.lift !== was || (this.lift && !cam.view)) {   // the same view, moved up: the fruit stays in sight
+        if (this.lift) cam.setViewOffset(r.w, r.h, 0, this.lift * r.h, r.w, r.h); else cam.clearViewOffset();
+      }
       const sx = shake ? (Math.random() - 0.5) * shake : 0, sy = shake ? (Math.random() - 0.5) * shake : 0;
       cam.position.x += sx; cam.position.y += sy;
       R.setViewport(r.x, H - r.y - r.h, r.w, r.h);
