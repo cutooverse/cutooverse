@@ -12,6 +12,18 @@ export const BACKDROPS = {
   kitchen: { name: { en: "Kitchen", fa: "آشپزخانه" }, bg: "#e6d6bf", floor: "#d6c2a6", ground: 0xcdb898, key: 0xfff0d8, rim: 0xfff5e6, light: true },
   night:   { name: { en: "Night", fa: "شب" }, bg: "#1b1026", floor: "#24152f", ground: 0x2a1838, key: 0xffb870, rim: 0xb889ff, light: false, map: "floor_night.jpg" },
   charcoal: { name: { en: "Charcoal", fa: "زغالی" }, bg: "#292a2d", floor: "#303235", ground: 0x2c2d30, key: 0xfff3e0, rim: 0xf2f4ff, light: false },
+  // a sky: [top, horizon]; bg is the horizon, where the floor fades into it
+  sunset:   { name: { en: "Sunset", fa: "غروب" }, sky: ["#ff9e6e", "#6a3f80"], bg: "#6a3f80", floor: "#53336a", ground: 0x4a2c5e, key: 0xffc896, rim: 0xff8fd0, light: false },
+  ocean:    { name: { en: "Ocean", fa: "اقیانوس" }, sky: ["#5fd0f0", "#136192"], bg: "#136192", floor: "#14577f", ground: 0x0f4a6c, key: 0xf4fbff, rim: 0xa6ecff, light: false },
+  forest:   { name: { en: "Forest", fa: "جنگل" }, sky: ["#5d8f5f", "#1a3a27"], bg: "#1a3a27", floor: "#1f412d", ground: 0x183524, key: 0xfff1cf, rim: 0xcfffd9, light: false },
+  candy:    { name: { en: "Candy", fa: "آب‌نبات" }, sky: ["#ffe0ef", "#ff9fcf"], bg: "#ff9fcf", floor: "#f5a7cf", ground: 0xe993c0, key: 0xfff2f8, rim: 0xffffff, light: true },
+  mint:     { name: { en: "Mint", fa: "نعنایی" }, sky: ["#e6fbf3", "#a3e2cf"], bg: "#a3e2cf", floor: "#9bd9c6", ground: 0x8ccbb8, key: 0xffffff, rim: 0xf0fffa, light: true },
+  lavender: { name: { en: "Lavender", fa: "اسطوخودوس" }, sky: ["#f1e8ff", "#b9a2ee"], bg: "#b9a2ee", floor: "#b29ae6", ground: 0xa18ad6, key: 0xfff8ff, rim: 0xffffff, light: true },
+  desert:   { name: { en: "Desert", fa: "کویر" }, sky: ["#ffe6b8", "#e2a86c"], bg: "#e2a86c", floor: "#d9a167", ground: 0xc98f58, key: 0xfff0d6, rim: 0xffe9c8, light: true },
+  sky:      { name: { en: "Blue sky", fa: "آسمان آبی" }, sky: ["#8fd0ff", "#e8f5ff"], bg: "#e8f5ff", floor: "#cfe2ee", ground: 0xb9cfdd, key: 0xffffff, rim: 0xffffff, light: true },
+  space:    { name: { en: "Space", fa: "فضا" }, sky: ["#14123a", "#020208"], stars: true, bg: "#020208", floor: "#0b0b1e", ground: 0x0a0a1a, key: 0xdfe6ff, rim: 0x9b86ff, light: false },
+  neon:     { name: { en: "Neon", fa: "نئون" }, sky: ["#2a0050", "#07001a"], stars: true, bg: "#07001a", floor: "#12002a", ground: 0x14002e, key: 0xff6fe0, rim: 0x23e6ff, light: false },
+  ember:    { name: { en: "Ember", fa: "اخگر" }, sky: ["#4a1208", "#120302"], bg: "#120302", floor: "#260904", ground: 0x2a0a04, key: 0xffa060, rim: 0xff5a30, light: false },
 };
 export const BOARDS = {
   walnut: { name: { en: "Walnut", fa: "گردو" } },
@@ -68,7 +80,7 @@ export class Stage {
       marble: new THREE.MeshPhysicalMaterial({ color: "#e9e6e1", roughness: 0.2, clearcoat: 0.6 }),
       glass: this.boardMats.glass,
     };
-    this.floorMaps = {};
+    this.floorMaps = {}; this.skies = {};
     this.floorTex = (url) => {                         // the theme wall's mottling, one tile every 0.9 m
       const t = tl.load(url); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(12 / 0.9, 12 / 0.9); return t;
     };
@@ -84,7 +96,8 @@ export class Stage {
 
   setLook(boardId, backdropId) {
     const b = BACKDROPS[backdropId] || BACKDROPS.teal;
-    this.scene.background.set(b.bg); this.scene.fog.color.set(b.bg);
+    this.scene.background = b.sky ? (this.skies[backdropId] ||= skyTexture(b)) : (this.flatBg ||= new THREE.Color()).set(b.bg);
+    this.scene.fog.color.set(b.bg);
     this.floor.material.color.set(b.floor);
     this.floor.material.map = b.map ? (this.floorMaps[b.map] ||= this.floorTex(b.map)) : null;
     this.floor.material.needsUpdate = true;
@@ -271,6 +284,25 @@ export class Stage {
 function fitFov(width, dist, aspect, minV) {
   const v = 2 * Math.atan(Math.tan(Math.atan(width / 2 / dist)) / aspect) * 180 / Math.PI;
   return Math.min(70, Math.max(minV, v));
+}
+
+// a backdrop's sky: top colour down to the horizon, and a few stars for the night ones
+function skyTexture(b) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 512;
+  const g = c.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, c.height);
+  grad.addColorStop(0, b.sky[0]); grad.addColorStop(0.4, b.sky[1]); grad.addColorStop(1, b.sky[1]);   // at the horizon by 40 %: the fog takes it from there
+  g.fillStyle = grad; g.fillRect(0, 0, c.width, c.height);
+  if (b.stars) {
+    const rnd = (a => () => ((a = Math.imul(a ^ a >>> 15, 2246822507) + 0x9e3779b9 | 0) >>> 0) / 4294967296)(5);
+    for (let k = 0; k < 140; k++) {
+      const y = rnd() ** 1.6 * c.height * 0.42;         // thicker near the top, none below the horizon
+      g.globalAlpha = 0.25 + rnd() * 0.75; g.fillStyle = "#fff";
+      g.beginPath(); g.arc(rnd() * c.width, y, 0.4 + rnd() * 1.3, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 function marbleTexture() {

@@ -22,7 +22,8 @@ const MAX_CUTS = 100;                        // the cuts slider, and how long Fr
 const LEVELS = [[2, 1], [4, 2], [3, 2], [6, 3], [7, 3], [8, 3], [10, 4], [12, 4], [15, 5]];
 const MIN_PIECE = 0.004;                     // crumbs under 0.4 % of the fruit are not counted
 // stars needed (one per Puzzle level, nine in all); the things a video opens are in tasks.js
-const UNLOCK = { "knife.cleaver": 2, "board.marble": 3, "backdrop.night": 4, "theme.halloween": 4, "material.glass": 6, "board.glass": 8 };
+const UNLOCK = { "knife.cleaver": 2, "board.marble": 3, "backdrop.night": 4, "theme.halloween": 4, "material.glass": 6, "board.glass": 8,
+  "backdrop.space": 5, "backdrop.neon": 7 };
 const REAL_SLICE_MAX = 12;                   // up to this many chops the fruit is always really cut,
 // and so is any that makes up to perf.realPieces pieces (300, 120 on phones); above, it bursts into cubes
 
@@ -58,7 +59,7 @@ fetch("/api/country").then(r => (r.ok ? r.json() : null)).then(j => {
 
 function applySettings() {
   const s = store.settings;
-  sound.on = s.sound; sound.haptics = s.haptics; sound.strength = s.strength;
+  sound.on = s.sound; sound.haptics = s.haptics; sound.strength = s.strength; sound.notes = s.notes;
   const lang = s.lang === "auto" ? (inIran() ? "fa" : "en") : s.lang;
   setLang(lang);
   document.documentElement.lang = lang;
@@ -92,7 +93,7 @@ function spawnFruit(st, withKnife) {
   const ys = pc.samples.map(s => s.clone().applyQuaternion(q).y);
   pieces.place(pc, new THREE.Vector3(pc.mesh.position.x, BOARD.h - Math.min(...ys) + 0.002, pc.mesh.position.z), q);
   Object.assign(st, { whole: pc, fruitId: f.id, scale: S, mats, fruitV: soup.V, top: pc.mesh.position.y + Math.max(...ys),
-    made: 0, planesW: [], planesO: [], phase: "ready", count: 1, shown: 1, countFrom: 1, countAt: 0, finishAt: 0, next: 0, plan: null, hoverY: 0,
+    made: 0, planesW: [], planesO: [], phase: "ready", count: 1, shown: 1, countFrom: 1, countAt: 0, finishAt: 0, next: 0, plan: null, hoverY: 0, best: null, cheered: false,
     soups: [pc.soup] });
   if (withKnife) {
     if (!st.knife) st.knife = new KnifeRig(stage.scene, looks.knife, new THREE.Vector3());
@@ -213,6 +214,14 @@ function impact(st, n, c) {
   if (st.planesO.length >= st.total) st.finishAt = performance.now() + (looks.style === "free" ? 120 : 1);   // straight on: no pause before it falls
 }
 
+// the most pieces this fruit has made with this style and count (Chop only)
+function keepBest(st) {
+  if (game.mode !== "chop") return;
+  const key = `${st.fruitId}|${looks.style}|${looks.style === "free" ? "" : st.total}`, before = store.best[key] || 0;
+  st.best = { n: Math.max(before, st.count), isNew: st.count > before && before > 0 };
+  if (st.count > before) { store.best[key] = st.count; save(); }
+}
+
 function finish(st, now) {
   const f = FRUITS[st.fruitId];
   for (const m of [st.mats.skin, st.mats.flesh]) m.userData.U.uPn.value = 0;
@@ -248,7 +257,8 @@ function finish(st, now) {
     }
     st.count = pieces.inSlot(st.i).filter(p => p.V > MIN_PIECE * st.fruitV).length;
     st.phase = "done";
-    sfx.slice(); buzz("chop");
+    keepBest(st);
+    sfx.slice(); sfx.chord(); buzz("chop");
   } else {
     st.count = estimate;
     const pc = st.whole;
@@ -262,7 +272,8 @@ function finish(st, now) {
       if (performance.now() - st.lastBurstTick > 40) { st.lastBurstTick = performance.now(); sfx.land(0.25 + Math.min(nl, 20) * 0.02); }
     }, force);
     st.phase = "burst";
-    sfx.burst(); buzz("burst");
+    keepBest(st);
+    sfx.burst(); sfx.chord(); buzz("burst");
     game.shake = 0.012;
   }
 }
@@ -328,13 +339,17 @@ function hud(force = false) {
   if (game.screen !== "play") return;
   if (m === "chop") {
     const done = s0.phase === "done" || s0.phase === "burst";
-    key = `${s0.made}|${s0.total}|${s0.shown}|${done}|${looks.style}|${getLang()}`;
+    const best = done && s0.best && s0.shown >= s0.count ? s0.best : null;   // once the count has run up
+    key = `${s0.made}|${s0.total}|${s0.shown}|${done}|${looks.style}|${best?.n}|${getLang()}`;
     if (key === lastHud && !force) return;
     const free = looks.style === "free";
     $("chopCounter").classList.toggle("free", free); $("chopCounter").classList.toggle("done", done);
     $("chopBig").textContent = free ? `${num(s0.made)} ${t(s0.made === 1 ? "cut" : "cuts")}` : `${num(s0.made)} / ${num(s0.total)}`;
     $("chopBar").style.transform = `scaleX(${s0.made / s0.total})`;
     $("chopSub").textContent = `${num(s0.shown)} ${t(s0.shown === 1 ? "piece" : "pieces")}`;
+    $("chopBest").textContent = best ? (best.isNew ? t("newBest") : t("bestN", { n: best.n })) : "";
+    $("chopBest").classList.toggle("new", !!best?.isNew);
+    if (best?.isNew && !s0.cheered) { s0.cheered = true; sfx.win(); buzz("burst"); }
     setHint(done ? t("tapNew") : t(free ? "holdFree" : "hold"), !done && s0.made === 0);
   } else if (m === "vs") {
     const done = game.slots.every(st => st.phase === "done");
@@ -418,7 +433,7 @@ function verdict() {
   $("result").classList.toggle("win", win);
   $("resultStars").innerHTML = win ? `<svg class="on"><use href="#i-star"/></svg>` : "";
   $("resultTitle").textContent = win ? (game.cutsUsed < cuts ? t("clearedSpare") : t("cleared")) : n > target ? t("tooMany") : t("tooFew");
-  $("resultText").textContent = win ? t("resultWin", { n, c: game.cutsUsed }) : t("resultLose", { n, t: target });
+  $("resultText").textContent = win ? t(game.cutsUsed === 1 && getLang() === "en" ? "resultWin1" : "resultWin", { n, c: game.cutsUsed }) : t("resultLose", { n, t: target });
   $("nextBtn").hidden = !win;
   $("nextBtn").textContent = game.levelIdx === LEVELS.length - 1 ? t("playAgain") : t("nextLevel");
   $("result").classList.add("show");
@@ -479,7 +494,7 @@ const canvasEl = $("stage");
 canvasEl.addEventListener("pointerdown", e => {
   unlock();
   if (sheetOpen || !$("levels").hidden || !$("photo").hidden) return;
-  canvasEl.setPointerCapture(e.pointerId);
+  try { canvasEl.setPointerCapture(e.pointerId); } catch (err) { /* already lifted: the touch still counts */ }
   if (game.screen === "home") { sfx.tick(); startMode("chop", true); game.holding = true; return; }   // touching it starts chopping
   if (game.screen !== "play") return;
   if (game.mode === "chop" || game.mode === "vs") {
@@ -519,6 +534,7 @@ function swipeCut(a, b) {
   });
   if (hit) {
     sfx.slice(); buzz("chop");
+    sfx.step(game.cutsUsed);                              // swiped cuts climb the scale too
     game.cutsUsed++;
     game.verdictAt = performance.now() + 1300;
     hud(true);
@@ -561,7 +577,7 @@ let sheetOpen = null, sheetTab = null;
 // three tabs, each a column of sections: what you cut, how it is cut, and where
 const LOOK_TABS = ["fruit", "cut", "scene"];
 const TAB_ICON = { fruit: "i-fruit", cut: "i-chop", scene: "i-scene" };
-const STYLES = ["free", "dice", "burst"], CAMS = ["top", "front", "close"];
+const STYLES = ["free", "dice", "burst"], CAMS = ["top", "front", "close"], NOTES = ["off", "piano", "organ", "musicbox", "marimba"];
 
 function itemName(cat, id) {
   if (cat === "fruit") return FRUITS[id].name[getLang()];
@@ -609,6 +625,7 @@ function renderSheet() {
     B.innerHTML = `
       <div class="row-set"><b>${t("sound")}</b><button class="switch" type="button" role="switch" data-sw="sound" aria-checked="${s.sound}" aria-label="${t("sound")}"></button></div>
       <p class="note" id="lagNote" style="margin:-4px 0 0">${(() => { const l = soundLag(); return l === null ? t("soundLagOff") : t("soundLag", { ms: Math.round(l * 1000) }); })()}</p>
+      <div class="sec"><h3>${t("notes")}</h3><p class="note">${t("notesNote")}</p>${seg("notes", NOTES.map(v => [v, t(`notes.${v}`)]), s.notes)}</div>
       <div class="row-set"><b>${t("haptics")}</b><button class="switch" type="button" role="switch" data-sw="haptics" aria-checked="${s.haptics}" aria-label="${t("haptics")}"></button></div>
       <div class="sec"><h3>${t("intensity")}</h3><p class="note">${t("hapticsNote")}</p>${seg("strength", [["light", t("light")], ["normal", t("normal")], ["strong", t("strong")]], s.strength)}</div>
       <div class="sec"><h3>${t("quality")}</h3>${seg("quality", [["auto", t("qAuto")], ["battery", t("qBattery")], ["best", t("qBest")]], s.quality)}</div>
@@ -656,7 +673,7 @@ function renderSheet() {
     })))}
     ${sec("camera", t(`cam.${looks.camera}`), seg("camera", CAMS.map(v => [v, `<span class="ico" data-icon="cam-${v}"></span>${t(`cam.${v}`)}`]), looks.camera), t(`cam.${looks.camera}.d`))}
     ${sec("board", itemName("board", looks.board), tiles(Object.keys(BOARDS).map(id => tile("board", id, BOARDS[id].name[L], null, `background:${BOARD_SW[id]}`))))}
-    ${sec("backdrop", itemName("backdrop", looks.backdrop), tiles(Object.entries(BACKDROPS).map(([id, b]) => tile("backdrop", id, b.name[L], null, `background:linear-gradient(180deg,${b.bg} 55%,${b.floor} 55%)`))))}`;
+    ${sec("backdrop", itemName("backdrop", looks.backdrop), tiles(Object.entries(BACKDROPS).map(([id, b]) => tile("backdrop", id, b.name[L], null, `background:linear-gradient(180deg,${b.sky ? `${b.sky[0]},${b.sky[1]}` : `${b.bg},${b.bg}`} 55%,${b.floor} 55%)`))))}`;
   const keep = [...B.querySelectorAll(".strip")].map(st => st.scrollLeft);   // a pick re-draws: rows stay where they were
   B.innerHTML = html;
   applyIcons(B);
@@ -715,6 +732,7 @@ $("sheetBody").addEventListener("click", e => {
   const key = sb.closest("[data-seg]").dataset.seg, v = sb.dataset.v;
   if (sheetOpen === "looks") return pick(key, v);
   store.settings[key] = v; save(); applySettings();
+  if (key === "notes") sfx.preview();                    // hear the instrument just picked
   if (key === "lang") { openSheet("settings"); if (game.screen === "play") { if (game.mode === "vs") buildVsLayer(); layoutVs(); hud(true); } }
   else renderSheet();
   sfx.tick();

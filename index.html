@@ -105,6 +105,10 @@ body.fa .logo p { letter-spacing: 0; font-size: 15px; }
 .counter .sub { font-weight: 800; font-size: 15px; color: var(--ink-soft); font-variant-numeric: tabular-nums; transition: font-size .25s, color .25s; }
 .counter.done .sub { font-size: 30px; font-weight: 900; color: var(--ink); }   /* the count is the point: big once it falls apart */
 .counter.free .progress { display: none; }
+.counter .best { font-weight: 800; font-size: 13px; color: var(--ink-soft); min-height: 16px; }
+.counter .best.new { color: var(--gold); font-size: 16px; animation: pop .5s cubic-bezier(.2,1.6,.4,1); }
+body[data-backdrop="light"] .counter .best.new { color: #b06a00; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } }
 .progress { width: min(220px, 56vw); height: 6px; border-radius: 6px; background: var(--glass-hi); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
 .progress i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--ink-soft), var(--ink)); border-radius: 6px; transform: scaleX(0); transform-origin: left; transition: transform .08s linear; }
 [dir="rtl"] .progress i { transform-origin: right; }
@@ -146,6 +150,7 @@ body.fa .vs-badge { font-size: 12px; }
 .result.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .result h2 { margin: 0; font-size: 28px; font-weight: 900; line-height: 1.05; text-wrap: balance; }
 .result.win h2 { color: var(--gold); }
+body[data-backdrop="light"] .result.win h2 { color: #b06a00; }
 .result p { margin: 0; font-weight: 500; color: var(--ink-soft); }
 .result .stars { display: flex; justify-content: center; gap: 6px; }
 .result .stars svg { width: 30px; height: 30px; color: rgba(255,255,255,.2); }
@@ -339,7 +344,7 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
       <button class="ib" id="hudSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
     </div>
   </div>
-  <div class="counter" id="chopCounter" hidden><div class="progress"><i id="chopBar"></i></div><div class="big" id="chopBig">0/50</div><div class="sub" id="chopSub"></div></div>
+  <div class="counter" id="chopCounter" hidden><div class="progress"><i id="chopBar"></i></div><div class="big" id="chopBig">0/50</div><div class="sub" id="chopSub"></div><div class="best" id="chopBest"></div></div>
   <div class="goal pad" id="goal" hidden>
     <div><div class="eyebrow" id="levelLabel"></div><div class="line" id="goalLine"></div></div>
     <div><div class="eyebrow" id="cutsLabel"></div><div class="knives" id="knives"></div></div>
