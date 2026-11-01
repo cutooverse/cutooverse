@@ -918,15 +918,17 @@ $("styleBar").addEventListener("click", e => {
 
 // icons: a PNG in icons/ (see icons/ICONS.md) replaces the drawn one when it is there
 const iconOk = new Map();                               // name -> true, false, or the pending check
+// raise when icons are added or changed: browsers kept the old "not found" for missing ones
+const ICONS_V = 2;
 function applyIcons(root = document) {
   root.querySelectorAll("[data-icon]:not(.png)").forEach(el => {
     const name = el.dataset.icon;
-    const put = () => { const img = new Image(); img.alt = ""; img.src = `icons/${name}.png`; el.classList.add("png"); el.replaceChildren(img); };
+    const put = () => { const img = new Image(); img.alt = ""; img.src = `icons/${name}.png?v=${ICONS_V}`; el.classList.add("png"); el.replaceChildren(img); };
     const known = iconOk.get(name);
     if (known === true) return put();
     if (known === false) return;
     if (known) { known.then(ok => ok && put()); return; }
-    const check = new Promise(res => { const img = new Image(); img.onload = () => res(true); img.onerror = () => res(false); img.src = `icons/${name}.png`; });
+    const check = new Promise(res => { const img = new Image(); img.onload = () => res(true); img.onerror = () => res(false); img.src = `icons/${name}.png?v=${ICONS_V}`; });
     iconOk.set(name, check);
     check.then(ok => { iconOk.set(name, ok); if (ok) put(); });
   });
