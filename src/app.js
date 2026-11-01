@@ -83,6 +83,7 @@ function newSlot(i, total) {
 
 function spawnFruit(st, withKnife) {
   pieces.clear(st.i);
+  if (!sheetOpen) stage.liftTo = 0;                      // a Burst may have slid the picture down
   st.burst?.dispose(); st.burst = null;
   const f = FRUITS[looks.fruit] || FRUITS.orange, S = SIZES[looks.size] || 1;
   const soup = buildSoup(f, seed++, S);
@@ -216,6 +217,17 @@ function impact(st, n, c) {
   if (st.planesO.length >= st.total) st.finishAt = performance.now() + (looks.style === "free" ? 120 : 1);   // straight on: no pause before it falls
 }
 
+// Burst lifts the fruit: if its top would rise behind the buttons or the count, the picture slides
+// down to keep it in sight (back to normal with the next fruit)
+function keepUnderHud(pc, rise) {
+  if (game.slots.length !== 1 || sheetOpen) return;
+  pc.mesh.updateMatrixWorld();
+  let top = Infinity;
+  for (const s of pc.samples) { const p = s.clone().applyMatrix4(pc.mesh.matrixWorld); p.y += rise; top = Math.min(top, stage.toScreen(p, 0).y); }
+  const safe = Math.max($("chopCounter").getBoundingClientRect().bottom, document.querySelector("#hud .bar-top").getBoundingClientRect().bottom) + 12;
+  if (top < safe) stage.liftTo = -Math.min(0.3, (safe - top) / innerHeight);
+}
+
 // the most pieces this fruit has made with this style and count (Chop only)
 function keepBest(st) {
   if (game.mode !== "chop") return;
@@ -225,6 +237,7 @@ function keepBest(st) {
 }
 
 function finish(st, now) {
+  if (!sheetOpen) stage.liftTo = 0;                      // the pieces land on the board: the picture back in place
   const f = FRUITS[st.fruitId];
   for (const m of [st.mats.skin, st.mats.flesh]) m.userData.U.uPn.value = 0;
   st.countFrom = 1; st.countAt = now;
@@ -667,9 +680,10 @@ function renderSheet() {
   const th = Object.keys(THEMES).find(themeOn);
   let html = "";
   if (sheetTab === "fruit") html = `
-    ${sec("fruit", itemName("fruit", looks.fruit), tiles([...FRUIT_IDS.map(id => tile("fruit", id, FRUITS[id].name[L], fruitThumb(id))),
+    ${sec("fruit", itemName("fruit", looks.fruit), tiles([   // your own photo first, then the fruits
+      `<button class="tile add" type="button" data-addphoto><i class="sw" data-icon="add-photo">+</i><span>${t("addPhoto")}</span></button>`,
       FRUITS.photo ? tile("fruit", "photo", FRUITS.photo.name[L], photoSaved?.img) : "",
-      `<button class="tile add" type="button" data-addphoto><i class="sw" data-icon="add-photo">+</i><span>${t("addPhoto")}</span></button>`]))}
+      ...FRUIT_IDS.map(id => tile("fruit", id, FRUITS[id].name[L], fruitThumb(id)))]))}
     <div class="pair">
       ${sec("size", t(`size.${looks.size}`), seg("size", [["s", t("size.s")], ["m", t("size.m")], ["l", t("size.l")]], looks.size))}
       ${sec("material", t(`mat.${looks.material}`), seg("material", ["real", "glass"].map(id => [id, `${t(`mat.${id}`)}${locked("material", id) ? '<svg class="lk"><use href="#i-lock"/></svg>' : ""}`]), looks.material))}
@@ -709,7 +723,7 @@ function pick(cat, id) {
     stage.setLook(looks.board, looks.backdrop);
   } else looks[cat] = id;
   save();
-  if (cat === "style" || cat === "speed") renderStyleBar();
+  if (cat === "style" || cat === "speed" || cat === "cuts") renderStyleBar();
   if (cat === "knife") { for (const st of game.slots) st.knife?.setKind(id); }
   else if (cat === "board" || cat === "backdrop") stage.setLook(looks.board, looks.backdrop);
   else if (cat === "camera") { stage.camView = id; stage.resize(); layoutVs(); }
@@ -903,7 +917,32 @@ $("photoUse").onclick = async () => {
 };
 
 // the cut-style switch under Chop and 1 VS N
+// the cut count beside "Hold to chop": one at a time up to 10, then in fives; a held button repeats
+function stepCuts(dir) {
+  const n = looks.cuts;
+  const next = dir > 0 ? (n >= 10 ? Math.floor(n / 5) * 5 + 5 : n + 1) : (n > 10 ? Math.ceil(n / 5) * 5 - 5 : n - 1);
+  looks.cuts = Math.min(MAX_CUTS, Math.max(1, next));
+  if (looks.cuts === n) return;
+  save(); sfx.tick();
+  $("cutStepN").textContent = num(looks.cuts);
+  const s0 = game.slots[0];
+  if (s0 && s0.phase === "ready" && s0.made === 0) { s0.total = chopTotal(); s0.plan = null; hud(true); }   // not started: just the new count
+  else resetRound();
+}
+let stepTimer = 0;
+const stopStep = () => { clearTimeout(stepTimer); clearInterval(stepTimer); };
+$("cutStep").addEventListener("pointerdown", e => {
+  const b = e.target.closest("[data-step]"); if (!b) return;
+  e.preventDefault(); stopStep();
+  const dir = Number(b.dataset.step);
+  stepCuts(dir);
+  stepTimer = setTimeout(() => { stepTimer = setInterval(() => stepCuts(dir), 90); }, 420);
+});
+for (const ev of ["pointerup", "pointerleave", "pointercancel"]) $("cutStep").addEventListener(ev, stopStep);
+
 function renderStyleBar() {
+  $("cutStep").hidden = $("styleBar").hidden || game.mode !== "chop" || looks.style === "free";   // Free has no count
+  $("cutStepN").textContent = num(looks.cuts);
   $("styleBar").innerHTML = STYLES.map(v => `<button type="button" data-style="${v}" aria-pressed="${looks.style === v}"><span class="ico" data-icon="style-${v}"></span>${t(`style.${v}`)}</button>`).join("")
     + `<button type="button" class="speed" data-speed aria-label="${t("speed")}"><span class="ico" data-icon="speed-${looks.speed}"></span>${t(`speed.${looks.speed}`)}</button>`;
   applyIcons($("styleBar"));
@@ -959,6 +998,7 @@ stage.renderer.setAnimationLoop(now => {
         st.hoverY = pc.mesh.position.y + 0.13;
         st.knife.home.y += 0.13;
         st.next = now + 420;
+        keepUnderHud(pc, 0.13);
       } else {
         st.phase = "chop";
         doChop(st);

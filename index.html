@@ -115,9 +115,15 @@ body[data-backdrop="light"] .counter .best.new { color: #b06a00; }
 [dir="rtl"] .progress i { transform-origin: right; }
 .pop { animation: pop .35s ease-out; }
 @keyframes pop { 40% { transform: scale(1.16); } }
-.hint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 34px); transform: translateX(-50%); padding: 11px 18px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); font-weight: 700; font-size: 15px; white-space: nowrap; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: opacity .3s; }
+.hintrow { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 34px); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; }
+.stepper { display: flex; align-items: center; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: auto; }
+.stepper[hidden] { display: none; }
+.stepper button { width: 38px; height: 42px; font-size: 22px; font-weight: 700; line-height: 1; color: var(--ink); touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.stepper button:active { transform: scale(0.9); }
+.stepper output { min-width: 3ch; text-align: center; font-weight: 900; font-size: 16px; font-variant-numeric: tabular-nums; }
+.hint { padding: 11px 18px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); font-weight: 700; font-size: 15px; white-space: nowrap; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: opacity .3s; }
 .hint.pulse { animation: pulse 1.6s ease-in-out infinite; }
-@keyframes pulse { 50% { transform: translateX(-50%) scale(1.05); } }
+@keyframes pulse { 50% { transform: scale(1.05); } }
 .stylebar { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 88px); transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; border-radius: 999px;
   background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: auto; }
 .stylebar button { padding: 9px 15px; border-radius: 999px; font-weight: 800; font-size: 14px; color: var(--ink-soft); white-space: nowrap; }
@@ -194,7 +200,9 @@ body[data-backdrop="light"] .result.win h2 { color: #b06a00; }
 .sheet-body > *, .sec { min-width: 0; }            /* a row of cards scrolls; it must not widen the sheet */
 #home, #hud { transition: opacity .25s; }
 body.looking #home, body.looking #hud { opacity: 0; pointer-events: none; }   /* Looks: only the preview above the sheet */
-.strip .tile { flex: 0 0 96px; scroll-snap-align: start; }
+.strip .tile { flex: 0 0 80px; scroll-snap-align: start; padding: 6px 4px 7px; border-radius: 14px; }
+.strip .tile span { font-size: 11.5px; }
+.strip .tile .lock { top: 4px; inset-inline-end: 4px; padding: 2px 5px; font-size: 10px; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 8px; }
 .sheet-head h2 { margin: 0; font-size: 22px; font-weight: 900; }
 .sheet-head .done { padding: 9px 16px; border-radius: 999px; background: var(--sheet-ink); color: var(--sheet); font-weight: 800; font-size: 14px; }
@@ -303,8 +311,8 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
   <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm2 0h6V8a3 3 0 0 0-6 0z"/></symbol>
   <symbol id="i-cam" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.5-2h5.6l1.5 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.8" r="3.3"/></g></symbol>
-  <symbol id="i-sound" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a7.8 7.8 0 0 1 0 11"/></g></symbol>
-  <symbol id="i-mute" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17.5V5.5l10-2v12"/><ellipse cx="6.5" cy="17.5" rx="2.6" ry="2.2" fill="currentColor"/><ellipse cx="16.5" cy="15.5" rx="2.6" ry="2.2" fill="currentColor"/><path d="M9 9l10-2"/></g></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".55"><path d="M9 17.5V5.5l10-2v12"/><ellipse cx="6.5" cy="17.5" rx="2.6" ry="2.2" fill="currentColor"/><ellipse cx="16.5" cy="15.5" rx="2.6" ry="2.2" fill="currentColor"/></g><path d="M4 3.5l16.5 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g></symbol>
   <symbol id="i-looks" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2-.5-1.3.4-2.6 1.8-2.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/></g><circle cx="7.5" cy="11" r="1.4" fill="currentColor"/><circle cx="10.5" cy="7.2" r="1.4" fill="currentColor"/><circle cx="15.2" cy="7.6" r="1.4" fill="currentColor"/></symbol>
@@ -356,7 +364,10 @@ body.fa .slider label { letter-spacing: 0; font-size: 14px; }
   <div class="pieces-count" id="piecesCount" hidden><b id="piecesNum">1</b><span id="piecesWord"></span></div>
   <div id="vsLayer" hidden></div>
   <div class="stylebar" id="styleBar" hidden></div>
-  <div class="hint" id="hint"></div>
+  <div class="hintrow">
+    <div class="stepper" id="cutStep" hidden><button type="button" data-step="-1" aria-label="Fewer cuts">−</button><output id="cutStepN">30</output><button type="button" data-step="1" aria-label="More cuts">+</button></div>
+    <div class="hint" id="hint"></div>
+  </div>
 </section>
 
 <section class="result" id="result" aria-live="polite">
