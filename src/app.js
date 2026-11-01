@@ -17,7 +17,7 @@ const $ = id => document.getElementById(id);
 const UP = new THREE.Vector3(0, 1, 0);
 const Y_UP = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);   // fruit frames are z up
 const SIZES = { s: 0.75, m: 1, l: 1.3 };
-const CUT_OPTIONS = [10, 50, 100, 250];
+const CUT_OPTIONS = [10, 20, 30, 50, 100, 250];
 const LEVELS = [[2, 1], [4, 2], [3, 2], [6, 3], [7, 3], [8, 3], [10, 4], [12, 4], [15, 5]];
 const MIN_PIECE = 0.004;                     // crumbs under 0.4 % of the fruit are not counted
 const UNLOCK = { "material.glass": 6, "knife.cleaver": 2, "knife.gold": 12, "board.marble": 3, "board.glass": 9, "backdrop.night": 4 };

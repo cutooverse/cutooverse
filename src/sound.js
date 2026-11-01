@@ -1,8 +1,20 @@
 // Every sound is made on the fly with Web Audio: no files to load. Plus phone vibration.
-let ctx = null, master = null, NOISE = null;
+let ctx = null, master = null, NOISE = null, OFFLINE = false, T0 = 0;
 export const sound = { on: true, haptics: true, strength: "normal" };
 
+// Recording a video: sounds are rendered afterwards into an OfflineAudioContext, each at the
+// moment (T0, seconds) it was asked for.
+export function useOffline(c) {
+  ctx = c; OFFLINE = true;
+  master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+  NOISE = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const d = NOISE.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+export function startAt(t) { T0 = t; }
+
 export function unlock() {
+  if (OFFLINE) return ctx;
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
@@ -22,7 +34,7 @@ export function unlock() {
 // unlock on every such gesture. While it is still locked, sounds are dropped, not queued (queued
 // ones all came out a second or two late).
 for (const ev of ["touchend", "click", "keydown"]) addEventListener(ev, () => unlock(), { capture: true, passive: true });
-const ready = () => ctx && ctx.state === "running";
+const ready = () => ctx && (OFFLINE || ctx.state === "running");
 
 // How long this device takes to get a sound out of the speaker: measured from the audio clock
 // against the clock of what is being heard right now, else what the browser reports.
@@ -47,7 +59,7 @@ function noise(dur, { type = "bandpass", f0 = 2000, f1 = f0, q = 1, gain = 0.5, 
   if (!sound.on || !unlock() || !ready()) return;
   const src = ctx.createBufferSource(); src.buffer = NOISE;
   const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q;
-  const t = ctx.currentTime + at;
+  const t = (OFFLINE ? T0 : ctx.currentTime) + at;
   f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
   const g = ctx.createGain();
   g.gain.setValueAtTime(gain, t);
@@ -58,7 +70,7 @@ function noise(dur, { type = "bandpass", f0 = 2000, f1 = f0, q = 1, gain = 0.5, 
 
 function tone(freq, dur, { type = "sine", gain = 0.3, at = 0, to = freq } = {}) {
   if (!sound.on || !unlock() || !ready()) return;
-  const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + at;
+  const o = ctx.createOscillator(), g = ctx.createGain(), t = (OFFLINE ? T0 : ctx.currentTime) + at;
   o.type = type; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, to), t + dur);
   g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
   o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.02);
