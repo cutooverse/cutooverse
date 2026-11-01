@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cut Count</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700;800;900&family=Vazirmatn:wght@500;700;900&display=swap">
+<style>
+/* Layout: the 3D board fills the screen; a home menu or a play HUD floats over it; looks and
+   settings rise as one bottom sheet. Colours echo the shorts: white titles, the red of "N Cuts". */
+:root {
+  --ink: #fdfaf4;
+  --ink-soft: rgba(253, 250, 244, 0.78);
+  --cut: #ff4136;
+  --cut-deep: #d92a20;
+  --gold: #ffc94a;
+  --glass: rgba(10, 28, 30, 0.6);
+  --glass-hi: rgba(253, 250, 244, 0.14);
+  --line: rgba(253, 250, 244, 0.2);
+  --sheet: #f6f2ea;
+  --sheet-ink: #1d2a2c;
+  --sheet-soft: #6d7775;
+  --sheet-card: #ffffff;
+  --sheet-line: #e2dccf;
+  --hud-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  --font: "Poppins", "Vazirmatn", system-ui, sans-serif;
+  --font-fa: "Vazirmatn", "Poppins", system-ui, sans-serif;
+  color-scheme: dark;
+}
+body[data-backdrop="light"] { --ink: #1d2a2c; --ink-soft: rgba(29, 42, 44, 0.75); --glass: rgba(255, 255, 255, 0.72); --glass-hi: rgba(29, 42, 44, 0.08); --line: rgba(29, 42, 44, 0.16); --hud-shadow: 0 1px 8px rgba(255, 255, 255, 0.6); }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: #163f42; color: var(--ink); font-family: var(--font); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+body.fa { font-family: var(--font-fa); }
+#stage { position: fixed; inset: 0; touch-action: none; }
+#stage canvas { display: block; }
+#trail { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+[hidden] { display: none !important; }
+.pad { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* round icon buttons */
+.ib { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: var(--ink); }
+.ib svg { width: 22px; height: 22px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); font-weight: 700; font-size: 14px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.pill svg { width: 16px; height: 16px; color: var(--gold); }
+
+/* ---------------------------------------------------------------- home */
+#home { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  background: linear-gradient(180deg, rgba(8, 24, 26, 0.55) 0%, rgba(8, 24, 26, 0) 42%, rgba(8, 24, 26, 0) 52%, rgba(8, 24, 26, 0.7) 100%); }
+body[data-backdrop="light"] #home { background: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 42%, rgba(255,255,255,0) 52%, rgba(255,255,255,0.75) 100%); }
+.home-top { display: flex; justify-content: space-between; align-items: center; }
+.home-top > *, .modes, .home-bottom > * { pointer-events: auto; }
+.home-hint { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 0 0 12px; font-weight: 700; font-size: 14px; color: var(--ink-soft); text-shadow: var(--hud-shadow); }
+.home-hint svg { width: 18px; height: 18px; animation: nudge 1.8s ease-in-out infinite; }
+@keyframes nudge { 50% { transform: translate(4px, -3px); } }
+.logo { text-align: center; margin-top: 2vh; text-shadow: var(--hud-shadow); }
+.logo h1 { margin: 0; font-weight: 900; font-size: clamp(46px, 13vw, 84px); line-height: 0.86; letter-spacing: -0.02em; }
+.logo h1 span { display: block; color: var(--cut); }
+.logo p { margin: 10px 0 0; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-soft); }
+body.fa .logo p { letter-spacing: 0; font-size: 15px; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(460px, 100%); margin: 0 auto; }
+.mode { position: relative; overflow: hidden; text-align: start; padding: 14px 14px 13px; border-radius: 20px; border: 1px solid var(--line);
+  background: linear-gradient(160deg, rgba(255,255,255,0.10), rgba(255,255,255,0) 55%), var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+  display: grid; grid-template-columns: 46px 1fr; gap: 2px 12px; align-items: center; transition: transform .15s, border-color .15s; }
+.mode:hover { border-color: var(--ink-soft); }
+.mode:active { transform: scale(0.97); }
+.mode .ic { grid-row: span 2; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: #fff;
+  background: var(--tone, var(--cut)); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.18), inset 0 2px 0 rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.25); }
+.mode .ic svg { width: 26px; height: 26px; }
+.ic.png { background: none !important; box-shadow: none !important; }
+.ico { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-inline-end: 6px; vertical-align: -6px; }
+.ico:empty { display: none; }
+.ico img, .ib.png img, .pill .png img, .btn .png img { width: 100%; height: 100%; object-fit: contain; }
+.ib.png img { width: 30px; height: 30px; }
+.sw.png { background: none !important; padding: 6px; box-sizing: border-box; }
+.sw.png img { width: 100%; height: 100%; object-fit: contain; }
+.ic.png img { width: 100%; height: 100%; object-fit: contain; }
+.mode[data-mode="chop"] { --tone: #ff4136; }
+.mode[data-mode="vs"] { --tone: #f2a020; }
+.mode[data-mode="levels"] { --tone: #24a38e; }
+.mode[data-mode="free"] { --tone: #5b7fe0; }
+.mode.hero::after { content: "\203A"; position: absolute; inset-inline-end: 16px; top: 50%; transform: translateY(-54%); font-size: 34px; font-weight: 500; line-height: 1; color: var(--ink-soft); }
+[dir="rtl"] .mode.hero::after { content: "\2039"; }
+.mode b { font-size: 17px; font-weight: 800; line-height: 1.1; }
+.mode small { font-size: 12px; color: var(--ink-soft); font-weight: 500; line-height: 1.25; }
+.mode.hero { grid-column: span 2; padding: 16px; }
+.mode.hero b { font-size: 21px; }
+.home-bottom { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); font-weight: 700; font-size: 14px; white-space: nowrap; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.btn svg { width: 18px; height: 18px; }
+.btn.red { background: var(--cut); border-color: var(--cut); color: #fff; }
+.btn:active { transform: scale(0.97); }
+
+/* ---------------------------------------------------------------- play HUD */
+#hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+#hud .bar-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
+#hud .bar-top > * { pointer-events: auto; }
+.bar-top .group { display: flex; gap: 8px; align-items: center; }
+.mode-label { font-weight: 800; font-size: 15px; text-shadow: var(--hud-shadow); }
+.counter { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 66px); transform: translateX(-50%); text-align: center; text-shadow: var(--hud-shadow); display: grid; justify-items: center; gap: 4px; }
+.counter .big { font-weight: 900; font-size: clamp(46px, 12vw, 72px); line-height: 1; font-variant-numeric: tabular-nums; }
+.counter .sub { font-weight: 700; font-size: 15px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.progress { width: 120px; height: 4px; border-radius: 4px; background: var(--glass-hi); overflow: hidden; }
+.progress i { display: block; height: 100%; width: 100%; background: var(--ink); border-radius: 4px; transform: scaleX(0); transform-origin: left; transition: transform .08s linear; }
+[dir="rtl"] .progress i { transform-origin: right; }
+.pop { animation: pop .35s ease-out; }
+@keyframes pop { 40% { transform: scale(1.16); } }
+.hint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 34px); transform: translateX(-50%); padding: 11px 18px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); font-weight: 700; font-size: 15px; white-space: nowrap; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: opacity .3s; }
+.hint.pulse { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: translateX(-50%) scale(1.05); } }
+.stylebar { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 88px); transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; border-radius: 999px;
+  background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: auto; }
+.stylebar button { padding: 9px 15px; border-radius: 999px; font-weight: 800; font-size: 14px; color: var(--ink-soft); white-space: nowrap; }
+.stylebar button[aria-pressed="true"] { background: var(--ink); color: #12302f; }
+.stylebar .speed { margin-inline-start: 4px; border-inline-start: 1px solid var(--line); border-radius: 0 999px 999px 0; color: var(--ink); }
+[dir="rtl"] .stylebar .speed { border-radius: 999px 0 0 999px; }
+body[data-backdrop="light"] .stylebar button[aria-pressed="true"] { color: #fff; }
+.goal { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 66px); left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; text-shadow: var(--hud-shadow); }
+.goal .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
+body.fa .goal .eyebrow { letter-spacing: 0; }
+.goal .line { font-size: clamp(26px, 6.5vw, 38px); font-weight: 900; line-height: 1.05; }
+.goal .line em { font-style: normal; color: var(--cut); }
+.knives { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+.knife-pip { width: 9px; height: 30px; border-radius: 2px 2px 5px 5px; background: linear-gradient(var(--ink) 62%, #3b2a20 62%); box-shadow: 0 2px 6px rgba(0,0,0,.4); transition: opacity .25s, transform .25s; }
+.knife-pip.used { opacity: 0.18; transform: translateY(4px); }
+.pieces-count { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 88px); text-align: center; text-shadow: var(--hud-shadow); }
+.pieces-count b { display: block; font-size: clamp(50px, 14vw, 80px); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.pieces-count span { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
+/* 1 VS N labels sit in each viewport */
+.vs-label { position: absolute; text-align: center; text-shadow: var(--hud-shadow); transform: translateX(-50%); }
+.vs-label .t { font-weight: 900; font-size: clamp(24px, 6vw, 40px); line-height: 1; }
+.vs-label .t.red { color: var(--cut); }
+.vs-label .n { font-weight: 900; font-size: clamp(30px, 8vw, 52px); line-height: 1; font-variant-numeric: tabular-nums; }
+.vs-label .s { font-weight: 700; font-size: 13px; color: var(--ink-soft); }
+.vs-badge { position: absolute; transform: translate(-50%, -50%); width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: var(--cut); color: #fff; font-weight: 900; font-size: 18px; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+body.fa .vs-badge { font-size: 12px; }
+
+/* result card and toast */
+.result { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); z-index: 7; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
+  width: min(340px, calc(100vw - 32px)); box-sizing: border-box; padding: 20px; border-radius: 20px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); text-align: center; display: grid; gap: 10px; }
+.result.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.result h2 { margin: 0; font-size: 28px; font-weight: 900; line-height: 1.05; text-wrap: balance; }
+.result.win h2 { color: var(--gold); }
+.result p { margin: 0; font-weight: 500; color: var(--ink-soft); }
+.result .stars { display: flex; justify-content: center; gap: 6px; }
+.result .stars svg { width: 30px; height: 30px; color: rgba(255,255,255,.2); }
+.result .stars svg.on { color: var(--gold); animation: pop .4s ease-out backwards; }
+.result .row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 70px); z-index: 30; transform: translate(-50%, -20px); opacity: 0; transition: opacity .3s, transform .3s; padding: 10px 16px; border-radius: 999px; background: var(--gold); color: #2a1d00; font-weight: 800; font-size: 14px; pointer-events: none; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------------------------------------------------------------- level picker */
+#levels { position: fixed; inset: 0; z-index: 12; display: grid; place-items: center; background: rgba(6, 18, 20, 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.levels-card { width: min(380px, calc(100vw - 32px)); box-sizing: border-box; padding: 20px; border-radius: 22px; background: var(--sheet); color: var(--sheet-ink); display: grid; gap: 14px; }
+.levels-card h2 { margin: 0; font-size: 22px; font-weight: 900; }
+.levels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.lv { aspect-ratio: 1; border-radius: 16px; background: var(--sheet-card); border: 1px solid var(--sheet-line); display: grid; place-items: center; align-content: center; gap: 4px; }
+.lv b { font-size: 26px; font-weight: 900; line-height: 1; }
+.lv .st { display: flex; gap: 2px; }
+.lv .st svg { width: 14px; height: 14px; color: #ddd5c4; }
+.lv .st svg.on { color: #f0ae17; }
+.lv.lock { opacity: .45; }
+.lv.lock svg.lk { width: 22px; height: 22px; color: var(--sheet-soft); }
+.lv:not(.lock):active { transform: scale(0.96); }
+
+/* ---------------------------------------------------------------- bottom sheet (looks, settings) */
+#sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: center; pointer-events: none; }
+#sheet .panel { pointer-events: auto; width: min(560px, 100%); max-height: min(72vh, 620px); display: flex; flex-direction: column; background: var(--sheet); color: var(--sheet-ink); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.35);
+  transform: translateY(105%); transition: transform .32s cubic-bezier(.2,.8,.2,1); padding-bottom: env(safe-area-inset-bottom, 0px); }
+#sheet.open .panel { transform: none; }
+#scrim { position: fixed; inset: 0; z-index: 19; background: rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity .3s; }
+#scrim.open { opacity: 1; pointer-events: auto; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 8px; }
+.sheet-head h2 { margin: 0; font-size: 22px; font-weight: 900; }
+.sheet-head .done { padding: 9px 16px; border-radius: 999px; background: var(--sheet-ink); color: var(--sheet); font-weight: 800; font-size: 14px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px 2px; padding: 0 12px 8px; flex-shrink: 0; }   /* wraps: every tab in view, with a mouse too */
+.tabs::-webkit-scrollbar { display: none; }
+.tab { padding: 8px 13px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--sheet-soft); white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--sheet-ink); color: var(--sheet); }
+.sheet-body { overflow-y: auto; padding: 4px 16px 18px; display: grid; gap: 14px; }
+.sec h3 { margin: 4px 0 8px; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--sheet-soft); }
+body.fa .sec h3 { letter-spacing: 0; font-size: 14px; }
+.sec .note { margin: -4px 0 8px; font-size: 12px; color: var(--sheet-soft); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.tile { position: relative; border-radius: 16px; background: var(--sheet-card); border: 2px solid var(--sheet-line); padding: 8px 6px 9px; display: grid; justify-items: center; gap: 4px; text-align: center; }
+.tile img, .tile .sw { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 10px; }
+.tile .sw { display: block; }
+.tile span { font-size: 13px; font-weight: 700; line-height: 1.15; }
+.tile[aria-pressed="true"] { border-color: var(--cut); box-shadow: 0 0 0 3px rgba(255, 65, 54, .18); }
+.tile.locked img, .tile.locked .sw { filter: grayscale(1) opacity(.45); }
+.tile .lock { position: absolute; top: 6px; inset-inline-end: 6px; display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px; border-radius: 999px; background: var(--sheet-ink); color: var(--sheet); font-size: 11px; font-weight: 800; }
+.tile .lock svg { width: 11px; height: 11px; color: var(--gold); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border-radius: 14px; background: #ebe5d8; }
+.seg button { flex: 1 1 auto; padding: 10px 12px; border-radius: 10px; font-weight: 700; font-size: 14px; color: var(--sheet-soft); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--sheet-card); color: var(--sheet-ink); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.row-set { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--sheet-line); }
+.row-set b { font-size: 16px; font-weight: 800; }
+.switch { width: 50px; height: 30px; border-radius: 999px; background: #d3ccbe; position: relative; transition: background .2s; flex-shrink: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: inset-inline-start .2s; }
+.switch[aria-checked="true"] { background: var(--sheet-ink); }
+.switch[aria-checked="true"]::after { inset-inline-start: 23px; }
+.help { margin: 0; font-size: 14px; line-height: 1.6; color: var(--sheet-ink); max-width: 62ch; }
+body.fa .help { line-height: 1.9; }
+/* ---------------------------------------------------------------- your photo */
+#photo { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; background: rgba(6, 18, 20, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; }
+.photo-card { width: min(400px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; box-sizing: border-box; padding: 18px; border-radius: 22px; background: var(--sheet); color: var(--sheet-ink); display: grid; gap: 14px; }
+.photo-card h2 { margin: 0; font-size: 22px; font-weight: 900; }
+.photo-card .note { margin: -6px 0 0; font-size: 13px; color: var(--sheet-soft); }
+.preview { position: relative; aspect-ratio: 1; border-radius: 16px; overflow: hidden; display: grid; place-items: center;
+  background: conic-gradient(#e7e1d4 25%, #f8f5ef 0 50%, #e7e1d4 0 75%, #f8f5ef 0) 0 0 / 22px 22px; }
+.preview canvas { max-width: 100%; max-height: 100%; }
+.preview .busy { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; background: rgba(246, 242, 234, 0.75); }
+.slider { display: grid; gap: 6px; }
+.slider label { font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--sheet-soft); }
+body.fa .slider label { letter-spacing: 0; font-size: 14px; }
+.slider input { width: 100%; accent-color: var(--cut); }
+.photo-msg { margin: 0; font-size: 14px; font-weight: 700; color: var(--cut-deep); }
+.photo-card .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.photo-card .btn { background: #e9e3d6; border-color: transparent; color: var(--sheet-ink); backdrop-filter: none; }
+.photo-card .btn.red { background: var(--cut); color: #fff; }
+.tile.add { border-style: dashed; color: var(--sheet-soft); }
+.tile.add .sw { display: grid; place-items: center; font-size: 34px; font-weight: 500; background: #f3eee4; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<canvas id="trail"></canvas>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.6l2.9 6 6.5.8-4.8 4.5 1.2 6.5L12 17.3 6.2 20.4l1.2-6.5L2.6 9.4l6.5-.8z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm2 0h6V8a3 3 0 0 0-6 0z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></g></symbol>
+  <symbol id="i-looks" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2-.5-1.3.4-2.6 1.8-2.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/></g><circle cx="7.5" cy="11" r="1.4" fill="currentColor"/><circle cx="10.5" cy="7.2" r="1.4" fill="currentColor"/><circle cx="15.2" cy="7.6" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-chop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h11l3-3H6z" fill="currentColor"/><path d="M6 13v6M10 13v6M14 13v6M18 13v6"/></g></symbol>
+  <symbol id="i-vs" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="12" r="4.2"/><path d="M7 7.8v8.4"/><circle cx="17" cy="12" r="4.2"/><path d="M14 9.5l6 5M14 14.5l6-5M17 7.8v8.4"/></g></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.8" fill="currentColor"/></g></symbol>
+  <symbol id="i-swipe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 18L20 6"/><path d="M15 6h5v5"/></g></symbol>
+</svg>
+
+<!-- home -->
+<section id="home" class="pad">
+  <div class="home-top">
+    <span class="pill"><span class="ico" data-icon="star" style="margin:0"><svg><use href="#i-star"/></svg></span><span id="starsHome">0</span></span>
+    <button class="ib" id="homeSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
+  </div>
+  <div class="logo"><h1>CUT<span>COUNT</span></h1><p data-t="tagline"></p></div>
+  <div>
+    <p class="home-hint"><svg><use href="#i-swipe"/></svg><span data-t="homeHint"></span></p>
+    <div class="modes">
+      <button class="mode hero" data-mode="chop" type="button"><span class="ic" data-icon="mode-chop"><svg><use href="#i-chop"/></svg></span><b data-t="mode.chop"></b><small data-t="mode.chop.d"></small></button>
+      <button class="mode" data-mode="vs" type="button"><span class="ic" data-icon="mode-vs"><svg><use href="#i-vs"/></svg></span><b data-t="mode.vs"></b><small data-t="mode.vs.d"></small></button>
+      <button class="mode" data-mode="levels" type="button"><span class="ic" data-icon="mode-puzzle"><svg><use href="#i-target"/></svg></span><b data-t="mode.levels"></b><small data-t="mode.levels.d"></small></button>
+      <button class="mode" data-mode="free" type="button" style="grid-column: span 2"><span class="ic" data-icon="mode-free"><svg><use href="#i-swipe"/></svg></span><b data-t="mode.free"></b><small data-t="mode.free.d"></small></button>
+    </div>
+    <div class="home-bottom">
+      <button class="btn red" id="homeLooks" type="button"><span class="ico" data-icon="looks" style="margin:0"><svg><use href="#i-looks"/></svg></span><span data-t="looks"></span></button>
+    </div>
+  </div>
+</section>
+
+<!-- play HUD -->
+<section id="hud" hidden>
+  <div class="bar-top pad">
+    <div class="group">
+      <button class="ib" id="backBtn" type="button" aria-label="Back"><svg><use href="#i-back"/></svg></button>
+      <span class="mode-label" id="modeLabel"></span>
+    </div>
+    <div class="group">
+      <button class="ib" id="hudLooks" type="button" aria-label="Looks" data-icon="looks"><svg><use href="#i-looks"/></svg></button>
+      <button class="ib" id="hudSettings" type="button" aria-label="Settings" data-icon="settings"><svg><use href="#i-gear"/></svg></button>
+    </div>
+  </div>
+  <div class="counter" id="chopCounter" hidden><div class="big" id="chopBig">0/50</div><div class="progress"><i id="chopBar"></i></div><div class="sub" id="chopSub"></div></div>
+  <div class="goal pad" id="goal" hidden>
+    <div><div class="eyebrow" id="levelLabel"></div><div class="line" id="goalLine"></div></div>
+    <div><div class="eyebrow" id="cutsLabel"></div><div class="knives" id="knives"></div></div>
+  </div>
+  <div class="pieces-count" id="piecesCount" hidden><b id="piecesNum">1</b><span id="piecesWord"></span></div>
+  <div id="vsLayer" hidden></div>
+  <div class="stylebar" id="styleBar" hidden></div>
+  <div class="hint" id="hint"></div>
+</section>
+
+<section class="result" id="result" aria-live="polite">
+  <div class="stars" id="resultStars"></div>
+  <h2 id="resultTitle"></h2>
+  <p id="resultText"></p>
+  <div class="row">
+    <button class="btn" id="retryBtn" type="button" data-t="tryAgain"></button>
+    <button class="btn" id="allBtn" type="button" data-t="allLevels"></button>
+    <button class="btn red" id="nextBtn" type="button" data-t="nextLevel"></button>
+  </div>
+</section>
+
+<section id="levels" hidden>
+  <div class="levels-card">
+    <div class="sheet-head" style="padding:0"><h2 data-t="chooseLevel"></h2><button class="done" id="levelsClose" type="button" data-t="back"></button></div>
+    <div class="levels-grid" id="levelsGrid"></div>
+  </div>
+</section>
+
+<div id="scrim"></div>
+<section id="sheet" aria-modal="true" role="dialog">
+  <div class="panel">
+    <div class="sheet-head"><h2 id="sheetTitle"></h2><button class="done" id="sheetDone" type="button" data-t="done"></button></div>
+    <div class="tabs" id="sheetTabs" role="tablist"></div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+</section>
+<div class="toast" id="toast"></div>
+
+<input type="file" id="photoFile" accept="image/*" hidden>
+<section id="photo" hidden aria-modal="true" role="dialog" aria-labelledby="photoTitle">
+  <div class="photo-card">
+    <h2 id="photoTitle" data-t="photoTitle"></h2>
+    <p class="note" data-t="photoNote"></p>
+    <div class="preview"><canvas id="photoCanvas" width="320" height="320"></canvas><div class="busy" id="photoBusy" hidden data-t="photoBusy"></div></div>
+    <p class="photo-msg" id="photoMsg" hidden data-t="photoFail"></p>
+    <div class="slider"><label for="photoTol" data-t="bgRemoval"></label><input type="range" id="photoTol" min="8" max="120" value="42"></div>
+    <div class="sec"><h3 data-t="inside" style="margin:0 0 8px;font-size:13px;font-weight:800;color:var(--sheet-soft)"></h3><div class="seg" id="photoInside"></div></div>
+    <div class="row">
+      <button class="btn" id="photoCancel" type="button" data-t="back"></button>
+      <button class="btn" id="photoAnother" type="button" data-t="chooseAnother"></button>
+      <button class="btn red" id="photoUse" type="button" data-t="useIt"></button>
+    </div>
+  </div>
+</section>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "rapier": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/rapier.es.js"
+} }
+</script>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
