@@ -142,13 +142,14 @@ export function makeKnife(kind = "chef") {
   return g;
 }
 
-const UP = new THREE.Vector3(0, 1, 0);
+const UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 
 // Drives one knife: hovering above the fruit, or chopping down a plane and back up.
 export class KnifeRig {
   constructor(scene, kind, home) {
     this.scene = scene; this.home = home.clone(); this.setKind(kind);
     this.anim = null; this.idleT = Math.random() * 10;
+    this.away = null;                                   // seconds out of sight after a flight (null: it is here)
   }
   setKind(kind) {
     if (this.group) this.scene.remove(this.group);
@@ -165,12 +166,62 @@ export class KnifeRig {
     return { along, u, q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(along, u, n)) };
   }
 
+  // Burst's cut: the edge goes first through the fruit, inside the cut plane, as a slice does (the
+  // knife never goes in point or handle first). The blade is turned in the plane to lie across the
+  // fruit's narrow side, centred on the fruit and, for one wider than the blade, enlarged: only the
+  // blade passes through it. From above, and it stops short of the board.
+  // body: { centre, axes: the fruit's three half-axes in the world, long }
+  flight(n, c, floorY, body) {
+    let best = null;
+    for (let i = 0; i < 16 && !(best?.clear >= 0); i++) {  // one that gets right through before the board, else the nearest to it
+      const f = this.flightOnce(n, c, floorY, body);
+      if (!best || f.clear > best.clear) best = f;
+    }
+    return best;
+  }
+  flightOnce(n, c, floorY, body) {
+    const p = this.pose(n);
+    const wide = Math.abs(n.y) > 0.85 || body?.long;    // a level plane or a long fruit: any direction in the plane
+    const span = a => (body ? Math.hypot(...body.axes.map(ax => ax.dot(a))) : 0.06);   // the fruit's half-width along the blade
+    let a = null, pick = Infinity;
+    for (let i = 0; i < 6; i++) {
+      const th = (Math.random() * 2 - 1) * (wide ? Math.PI : 0.45);
+      const t = p.along.clone().multiplyScalar(Math.cos(th)).addScaledVector(p.u, Math.sin(th));
+      const w = span(t) * (0.9 + Math.random() * 0.2);
+      if (w < pick) { pick = w; a = t; }
+    }
+    const nn = n.clone(), v = new THREE.Vector3().crossVectors(nn, a);   // v: from the edge up to the spine
+    if (v.y < 0) { a.negate(); v.negate(); }
+    if (a.y < -0.1 || (Math.abs(a.y) <= 0.1 && Math.random() < 0.5)) { a.negate(); nn.negate(); }   // the handle on the high side
+    const h = span(a), k = Math.min(1.7, Math.max(1, h / 0.092));        // the blade is 0.208 long: -0.108 to 0.10
+    const mid = body ? c.clone().addScaledVector(a, body.centre.clone().sub(c).dot(a)) : c.clone();
+    const spare = Math.max(0, 0.092 * k - h) * 0.6;                      // how far the blade may sit off-centre
+    const low = Math.min(a.y * -0.108, a.y * 0.225) * k - floorY - 0.004;   // its lowest point (the tip, or the handle's end) over the board
+    let slack = spare * (Math.random() * 2 - 1);
+    if (mid.y + a.y * (0.004 * k + slack) + low < 0.012) slack = spare * Math.sign(a.y);   // a steep blade by the board: as high as it goes
+    const at0 = mid.addScaledVector(a, 0.004 * k + slack);               // where the knife is as its edge meets the plane's middle
+    const off = body ? c.clone().sub(body.centre).dot(v) : 0, deep = body ? span(v) : 0.06;
+    const through = off + deep + 0.052 * k;                              // how far past the middle the whole blade has left the fruit
+    const before = Math.max(0.36, deep - off + 0.08);
+    let after = Math.max(0.30, through + 0.02);
+    if (v.y > 0.05) after = Math.max(0, Math.min(after, (at0.y + low) / v.y));
+    return { q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(a, v, nn)), k, clear: after - through,
+      from: at0.clone().addScaledVector(v, before), to: at0.clone().addScaledVector(v, -after), at: before / (before + after), len: (before + after) / 0.66 };
+  }
+
   // n: plane normal, c: a point on the plane inside the fruit, top: fruit top height, floorY: board top.
   // how: "chop" (down onto the board), "slide" (a level cut, in from the front), "fly" (through the
-  // fruit in the air, from one side to the other)
-  chop(n, c, top, floorY, dur, onImpact, how = "chop") {
+  // fruit in the air, edge first: see flight)
+  chop(n, c, top, floorY, dur, onImpact, how = "chop", body = null) {
     dur = Math.max(0.05, dur);
     if (this.anim && !this.anim.hit) { this.anim.hit = true; this.anim.onImpact?.(); }   // slow frames: never lose a cut
+    this.away = null; this.group.visible = true; this.group.scale.setScalar(1);
+    if (how === "fly") {
+      const f = this.flight(n, c, floorY, body);
+      this.group.quaternion.copy(f.q); this.group.scale.setScalar(f.k); this.group.position.copy(f.from);
+      this.anim = { line: [f.from, f.to], t: 0, dur: dur * f.len, hit: false, onImpact, at: f.at, fly: true };
+      return dur * f.len * f.at;
+    }
     if (how === "slide" || (how === "chop" && Math.abs(n.y) > 0.8)) {
       const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0)));
       this.group.quaternion.copy(q);                    // blade flat, edge pointing away from you
@@ -180,12 +231,6 @@ export class KnifeRig {
     }
     const { along, u, q } = this.pose(n);
     this.group.quaternion.copy(q);
-    if (how === "fly") {                                // a streak through the fruit along the blade
-      const side = Math.random() < 0.5 ? 1 : -1;
-      const from = c.clone().addScaledVector(along, 0.32 * side).addScaledVector(u, 0.03), to = c.clone().addScaledVector(along, -0.30 * side).addScaledVector(u, -0.03);
-      this.anim = { line: [from, to], t: 0, dur, hit: false, onImpact, at: 0.5 };
-      return dur * 0.5;
-    }
     const p0 = c.clone().addScaledVector(u, -(c.y - floorY) / Math.max(u.y, 0.2));
     const sTop = (top + 0.035 - floorY) / Math.max(u.y, 0.2);
     this.anim = { p0, u, sTop, t: 0, dur, hit: false, onImpact };
@@ -197,11 +242,14 @@ export class KnifeRig {
     if (this.anim) {
       const a = this.anim; a.t += dt;
       const k = a.t / a.dur;
-      if (a.line) {                                     // slide or fly: straight through, fast in the middle
-        const e = k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k);
+      if (a.line) {                                     // a slide: straight through, fast in the middle; a flight: at one speed
+        const e = a.fly ? k : k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k);
         g.position.lerpVectors(a.line[0], a.line[1], Math.min(1, e));
         if (!a.hit && k >= a.at) { a.hit = true; a.onImpact?.(); }
-        if (k >= 1) this.anim = null;
+        if (k >= 1) {
+          this.anim = null;
+          if (a.fly) { this.away = 0; g.visible = false; }   // gone past the fruit: it does not come back through it
+        }
         return;
       }
       const down = 0.42;
@@ -214,8 +262,15 @@ export class KnifeRig {
     }
     this.idleT += dt;                                  // hover above the fruit, breathing a little
     const target = this.home.clone().add(new THREE.Vector3(0, Math.sin(this.idleT * 1.6) * 0.004, 0));
-    g.position.lerp(target, Math.min(1, dt * 6));
     const qIdle = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0.25, -0.12));
+    if (this.away !== null) {                           // after a flight: a moment out of sight, then back above the fruit
+      this.away += dt;
+      if (this.away < 0.8) return;                      // longer than the slowest beat: never back between two cuts
+      this.away = null;
+      g.visible = true; g.position.copy(target); g.quaternion.copy(qIdle); g.scale.setScalar(0.01);
+    }
+    g.scale.lerp(ONE, Math.min(1, dt * 12));
+    g.position.lerp(target, Math.min(1, dt * 6));
     g.quaternion.slerp(qIdle, Math.min(1, dt * 6));
   }
 }

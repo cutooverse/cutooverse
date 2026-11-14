@@ -168,7 +168,7 @@ function diceEdge(st) {
 function doChop(st) {
   const style = looks.style, f = FRUITS[st.fruitId], A = f.axes, S = st.scale, pc = st.whole;
   pc.mesh.updateMatrixWorld();
-  let n, c, how = "chop";
+  let n, c, how = "chop", body = null;
   if (style === "dice") {
     if (!st.plan) st.plan = planDice(st);
     const p = st.plan[Math.min(st.made, st.plan.length - 1)];
@@ -183,6 +183,8 @@ function doChop(st) {
     if (style === "burst") {                           // any direction: knives come from every side
       n = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
       how = "fly";
+      body = { long, centre: new THREE.Vector3().sub(pc.com).applyMatrix4(pc.mesh.matrixWorld),
+        axes: [0, 1, 2].map(i => new THREE.Vector3().setComponent(i, A[i] * S).applyQuaternion(pc.mesh.quaternion)) };
     } else {
       const a = Math.random() * Math.PI * 2;
       n = new THREE.Vector3(Math.cos(a), (Math.random() - 0.5) * 0.55, Math.sin(a)).normalize();
@@ -190,7 +192,7 @@ function doChop(st) {
   }
   st.made++;
   const dur = Math.min((style === "burst" ? 0.15 : 0.24) * Math.min(pace(), 1.8), beat(st) * 0.95);
-  const hitIn = st.knife.chop(n, c, st.top, BOARD.h, dur, () => impact(st, n, c), how);
+  const hitIn = st.knife.chop(n, c, st.top, BOARD.h, dur, () => impact(st, n, c), how, body);
   sfx.chop(st.made, Math.max(0, hitIn - audioLead()), glassSound());  // started early by the device's sound lag: it lands on the hit
 }
 
