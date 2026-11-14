@@ -696,12 +696,11 @@ function renderSheet() {
     ${sec("knife", itemName("knife", looks.knife), tiles(Object.keys(KNIVES).map(id => tile("knife", id, KNIVES[id].name[L], knifeThumb(id)))))}`;
   if (sheetTab === "scene") html = `
     ${sec("theme", th && itemName("theme", th), tiles(Object.entries(THEMES).map(([id, th]) => {   // the board on its backdrop
-      const b = BACKDROPS[th.backdrop];
-      return tile("theme", id, th.name[L], null, `background:${BOARD_SW[th.board].replace("center/cover", "center/70% 40% no-repeat")},linear-gradient(180deg,${b.bg} 50%,${b.floor} 50%)`);
+      return tile("theme", id, th.name[L], null, `background:${BOARD_SW[th.board].replace("center/cover", "center 72%/70% 34% no-repeat")},center/cover url(${stage.backdropPreview(th.backdrop)})`);
     })))}
     ${sec("camera", t(`cam.${looks.camera}`), seg("camera", CAMS.map(v => [v, `<span class="ico" data-icon="cam-${v}"></span>${t(`cam.${v}`)}`]), looks.camera), t(`cam.${looks.camera}.d`))}
     ${sec("board", itemName("board", looks.board), tiles(Object.keys(BOARDS).map(id => tile("board", id, BOARDS[id].name[L], null, `background:${BOARD_SW[id]}`))))}
-    ${sec("backdrop", itemName("backdrop", looks.backdrop), tiles(Object.entries(BACKDROPS).map(([id, b]) => tile("backdrop", id, b.name[L], null, `background:linear-gradient(180deg,${b.sky ? `${b.sky[0]},${b.sky[1]}` : `${b.bg},${b.bg}`} 55%,${b.floor} 55%)`))))}`;
+    ${sec("backdrop", itemName("backdrop", looks.backdrop), tiles(Object.entries(BACKDROPS).map(([id, b]) => tile("backdrop", id, b.name[L], stage.backdropPreview(id)))))}`;
   const keep = [...B.querySelectorAll(".strip")].map(st => st.scrollLeft);   // a pick re-draws: rows stay where they were
   B.innerHTML = html;
   applyIcons(B);

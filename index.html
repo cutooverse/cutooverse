@@ -37,6 +37,9 @@ body { margin: 0; overflow: hidden; background: #163f42; color: var(--ink); font
 body.fa { font-family: var(--font-fa); }
 #stage { position: fixed; inset: 0; touch-action: none; }
 #stage canvas { display: block; }
+/* a lens's darker corners, over the 3D picture and under everything else */
+#stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 85% 75% at 50% 46%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.34) 100%); }
+body[data-backdrop="light"] #stage::after { opacity: 0.4; }
 #trail { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
 button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
