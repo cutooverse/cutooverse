@@ -10,21 +10,34 @@ const _inv = new THREE.Matrix4(), _iq = new THREE.Quaternion();
 export class Pieces {
   constructor(stage, phys) { this.stage = stage; this.phys = phys; this.list = []; }
 
-  add(soup, position, quaternion, v, w, mats, slot) {
+  // The costly part of add(), which can be done ahead of time (Flurry does it while the knives
+  // still fly, a few soups a frame, so the burst itself is light). Kept on the soup, which is not
+  // touched and can still be cut: its middle, its geometry about that middle, its collision hull.
+  static prepare(soup) {
+    if (soup.prep) return soup.prep;
     const { V, c } = volumeAndCentre(soup.P);
-    for (let i = 0; i < soup.P.length; i += 3) { soup.P[i] -= c.x; soup.P[i + 1] -= c.y; soup.P[i + 2] -= c.z; }
-    const mesh = new THREE.Mesh(makeGeometry(soup), [mats.skin, mats.flesh]);
+    const P = new Float32Array(soup.P.length);
+    for (let i = 0; i < P.length; i += 3) { P[i] = soup.P[i] - c.x; P[i + 1] = soup.P[i + 1] - c.y; P[i + 2] = soup.P[i + 2] - c.z; }
+    const samples = hullSamples(P);
+    const R = Math.sqrt(samples.reduce((a, s) => a + s.lengthSq(), 0) / samples.length) || 0.01;
+    // the collider is a little smaller than the piece: freshly cut neighbours share a face, and
+    // touching hulls would be pushed apart as if they overlapped (dice cubes flew off the board)
+    const pts = Object.assign(new Float32Array(samples.flatMap(s => [s.x * 0.9, s.y * 0.9, s.z * 0.9])),
+      { radius: R * 0.5, flat: !(V > 1e-9 && V / R ** 3 > 0.02) });   // a speck (under 1 mm3) or paper-thin: no hull for it
+    return (soup.prep = { V, c, P, geo: makeGeometry({ P, N: soup.N, O: soup.O, M: soup.M }), samples, R, pts });
+  }
+
+  // ccd: small pieces are kept from passing through things (costly: not for hundreds of them at once)
+  add(soup, position, quaternion, v, w, mats, slot, ccd = true) {
+    const { V, c, P, geo, samples, R, pts } = Pieces.prepare(soup);
+    soup.P = P; soup.prep = null;                        // from here on the soup is about its own middle
+    const mesh = new THREE.Mesh(geo, [mats.skin, mats.flesh]);
     mesh.receiveShadow = true;
     mesh.quaternion.copy(quaternion);
     mesh.position.copy(position).add(c.clone().applyQuaternion(quaternion));
     this.stage.scene.add(mesh);
-    const samples = hullSamples(soup.P);
-    const R = Math.sqrt(samples.reduce((a, s) => a + s.lengthSq(), 0) / samples.length) || 0.01;
     mesh.castShadow = !perf.low || R > 0.012;            // on phones crumbs cast no shadow (a draw call less each)
-    // the collider is a little smaller than the piece: freshly cut neighbours share a face, and
-    // touching hulls would be pushed apart as if they overlapped (dice cubes flew off the board)
-    const pts = new Float32Array(samples.flatMap(s => [s.x * 0.9, s.y * 0.9, s.z * 0.9]));
-    const body = this.phys.body(mesh.position, mesh.quaternion, Object.assign(pts, { radius: R * 0.5 }), { v, w, small: R < 0.008 });
+    const body = this.phys.body(mesh.position, mesh.quaternion, pts, { v, w, small: ccd && R < 0.008 });
     const piece = { mesh, soup, V, samples, R, com: c.clone(), body, mats, slot, pinned: false, vy: 0, landed: 0 };
     this.list.push(piece);
     return piece;

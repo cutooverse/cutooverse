@@ -7,7 +7,7 @@ import { FRUITS, FRUIT_IDS, buildSoup, fruitMaterials, forgetMaterials, MAXP } f
 import { volumeAndCentre, slice } from "./slice.js";
 import { loadImage, prepare, segment, coverage, cutout, buildPhotoFruit, toStored, fromStored, INSIDES } from "./photo.js";
 import { KnifeRig, KNIVES } from "./knife.js";
-import { Burst, countPieces } from "./burst.js";
+import { Burst, countPieces, PieceCount } from "./burst.js";
 import { sfx, buzz, sound, unlock, audioLead, soundLag } from "./sound.js";
 import { t, num, setLang, getLang } from "./i18n.js";
 import { store, save, totalStars } from "./store.js";
@@ -102,7 +102,7 @@ function spawnFruit(st, withKnife) {
   pieces.place(pc, new THREE.Vector3(pc.mesh.position.x, BOARD.h - Math.min(...ys) + 0.002, pc.mesh.position.z), q);
   Object.assign(st, { whole: pc, fruitId: f.id, scale: S, mats, fruitV: soup.V, top: pc.mesh.position.y + Math.max(...ys),
     made: 0, planesW: [], planesO: [], phase: "ready", count: 1, shown: 1, countFrom: 1, countAt: 0, finishAt: 0, next: 0, plan: null, hoverY: 0, best: null, cheered: false,
-    soups: [pc.soup], capped: false });
+    soups: [pc.soup], capped: false, counter: null });
   if (withKnife) {
     if (!st.knife) st.knife = new KnifeRig(stage.scene, looks.knife, new THREE.Vector3());
     st.knife.stop();                                    // knives still in the air were for the last fruit
@@ -225,6 +225,7 @@ function impact(st, n, c) {
   const cL = c.clone().applyMatrix4(new THREE.Matrix4().copy(pc.mesh.matrixWorld).invert());
   const d = (nL.dot(cL) + nL.dot(pc.com)) / st.scale;              // the plane in the fruit's own frame
   st.planesO.push([nL.x, nL.y, nL.z, d]);
+  st.counter?.add(st.planesO[st.planesO.length - 1]);  // Flurry counts as it cuts
   st.planesW.push({ n: n.clone(), c: c.clone() });
   // cut the fruit's data a little at every chop (its frame stays the same while it is chopped),
   // so the ending only has to build the pieces: doing all the cuts at the end froze the game.
@@ -289,7 +290,7 @@ function finish(st, now) {
   const edge = dice ? diceEdge(st) : 0;
   const made = st.planesO.length;                      // Free style stops wherever you let go
   const flurry = looks.style === "flurry";             // always real pieces; past the cap the count is worked out
-  const estimate = flurry ? (st.capped ? countPieces(f, st.planesO) : 0) : made <= REAL_SLICE_MAX && !dice ? 0 : countPieces(f, st.planesO);
+  const estimate = flurry ? (st.capped ? (st.counter ? st.counter.count() : countPieces(f, st.planesO)) : 0) : made <= REAL_SLICE_MAX && !dice ? 0 : countPieces(f, st.planesO);
   if (!dice && (flurry || made <= REAL_SLICE_MAX || estimate <= perf.realPieces)) {
     const one = made === 1, style = looks.style, whole = st.whole, centre = whole.mesh.position.clone();
     if (st.soups && (flurry || made <= REAL_SLICE_MAX)) {   // already cut chop by chop: just build the pieces
@@ -297,7 +298,8 @@ function finish(st, now) {
       const soups = st.soups.length > 1 ? st.soups : [];
       if (soups.length) {
         pieces.remove(whole);
-        for (const s of soups) pieces.add(s, pos, quat, new THREE.Vector3(), new THREE.Vector3(), st.mats, st.i);
+        const few = soups.length <= 40;             // hundreds of crumbs with CCD stall the physics; they only fall onto the board anyway
+        for (const s of soups) pieces.add(s, pos, quat, new THREE.Vector3(), new THREE.Vector3(), st.mats, st.i, few);
       }
       for (const pl of st.planesW) stage.splash(pl.c, pl.n, one ? 22 : 5, f.juice);
     } else {
@@ -1046,12 +1048,18 @@ stage.renderer.setAnimationLoop(now => {
         st.knife.home.y += rise;
         st.next = now + 420;
         keepUnderHud(pc, rise);
-        if (looks.style === "flurry") sfx.lift();
+        if (looks.style === "flurry") { sfx.lift(); st.counter = new PieceCount(FRUITS[st.fruitId]); }   // made while it rises, before the first knife
       } else {
         st.phase = "chop";
         doChop(st);
         st.next = now + beat(st) * 1000;
       }
+    }
+    // Flurry: once the fruit's pieces are settled (no more cuts make new ones), get them ready a
+    // few at a time, so that the burst only has to put them into the world
+    if (looks.style === "flurry" && pc && st.soups?.length > 1 && (st.capped || st.made >= st.total)) {
+      const t0 = performance.now(), budget = st.made >= st.total ? 6 : 3;
+      for (const s of st.soups) if (!s.prep) { Pieces.prepare(s); if (performance.now() - t0 > budget) break; }
     }
     if (pc?.pinned) {                                    // hover there, turning slowly
       pc.mesh.position.y += (st.hoverY + Math.sin(now / 420) * 0.004 - pc.mesh.position.y) * Math.min(1, dt * 7);

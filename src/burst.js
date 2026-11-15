@@ -23,6 +23,30 @@ export function countPieces(fruit, planes) {
   return Math.max(1, seen.size);
 }
 
+// The same count kept up cut by cut, so that none of the work is left for the moment of the burst:
+// add(plane) after every cut, count() at the end. (countPieces goes over every point for every
+// plane at once: 50 ms for a hundred cuts, in the one frame where it shows most.)
+export class PieceCount {
+  constructor(fruit) {
+    const [a, b, c] = fruit.axes, V = fruit.vol || 4 / 3 * Math.PI * a * b * c;
+    const inside = fruit.inside || ((x, y, z) => (x / a) ** 2 + (y / b) ** 2 + (z / c) ** 2 <= 0.94);
+    const g = Math.cbrt(V / 70000), pts = [];
+    for (let x = -a; x <= a; x += g) for (let y = -b; y <= b; y += g) for (let z = -c; z <= c; z += g) if (inside(x, y, z)) pts.push(x, y, z);
+    this.pts = new Float32Array(pts); this.n = 0;
+    this.h1 = new Uint32Array(pts.length / 3); this.h2 = new Uint32Array(pts.length / 3);
+  }
+  add(p) {
+    const i = this.n++, k1 = (Math.imul(i + 1, 2654435761) ^ 0x5bd1e995) >>> 0, k2 = (Math.imul(i + 7, 1597334677) ^ 0x27d4eb2d) >>> 0;
+    const { pts, h1, h2 } = this;
+    for (let j = 0, q = 0; j < h1.length; j++, q += 3) if (p[0] * pts[q] + p[1] * pts[q + 1] + p[2] * pts[q + 2] >= p[3]) { h1[j] ^= k1; h2[j] ^= k2; }
+  }
+  count() {
+    const seen = new Set();
+    for (let j = 0; j < this.h1.length; j++) seen.add(this.h1[j] * 2097152 + (this.h2[j] & 0x1fffff));
+    return Math.max(1, seen.size);
+  }
+}
+
 const _m = new THREE.Matrix4(), _s = new THREE.Vector3(1, 1, 1), _p = new THREE.Vector3(), _q = new THREE.Quaternion();
 import { perf } from "./perf.js";
 

@@ -120,7 +120,7 @@ function studio() {
   const limit = ctx.createDynamicsCompressor();        // a flurry of a hundred knives must not clip
   limit.threshold.value = -16; limit.knee.value = 10; limit.ratio.value = 4; limit.attack.value = 0.003; limit.release.value = 0.12;
   limit.connect(master);
-  const bus = ctx.createGain(); bus.connect(limit);
+  const bus = ctx.createGain(); bus.gain.value = 1.3; bus.connect(limit);
   const len = Math.floor(sr * 0.6), ir = ctx.createBuffer(2, len, sr);   // the room: 0.38 s, a few early reflections
   for (let ch = 0; ch < 2; ch++) {
     const d = ir.getChannelData(ch);
@@ -184,9 +184,9 @@ const studioSfx = {
     if (!can()) return;
     const t = when(at), dur = 0.30, mid = 0.135;
     const band = filter("bandpass", 380, 1.1);
-    band.frequency.setValueAtTime(380, t); band.frequency.exponentialRampToValueAtTime(2400, t + mid); band.frequency.exponentialRampToValueAtTime(520, t + dur);
+    band.frequency.setValueAtTime(380, t); band.frequency.exponentialRampToValueAtTime(1800, t + mid); band.frequency.exponentialRampToValueAtTime(480, t + dur);
     const amp = ctx.createGain(), curve = new Float32Array(24);
-    for (let i = 0; i < 24; i++) curve[i] = 0.27 * g * Math.exp(-((((i / 23) * dur - mid) / 0.075) ** 2));
+    for (let i = 0; i < 24; i++) curve[i] = 0.14 * g * Math.exp(-((((i / 23) * dur - mid) / 0.075) ** 2));
     amp.gain.setValueCurveAtTime(curve, t, dur);
     out(source(NOISE, t, dur).connect(band).connect(filter("lowpass", 4500)).connect(amp), t, dur, p0, p1);
   },
@@ -194,9 +194,9 @@ const studioSfx = {
   cut(i = 0, at = 0, pan = 0, g = 1) {
     if (!can()) return;
     const t = when(at), dur = between(0.11, 0.17);
-    out(source(studio().crack, t, 0.07).connect(filter("bandpass", 2900, 0.6)).connect(env(t, 0.55 * g, 0.0005, 0.03, 0.08)), t, dur, pan);
-    out(squelch(t, dur, { lp: 1600, f1: between(380, 520), q1: 6, f2: between(1000, 1400), q2: 8, level2: 0.6,
-      peak: 1.9 * g, attack: 0.006, decay: 0.05, wob: between(25, 55), depth: 0.5 }), t, dur, pan);
+    out(source(studio().crack, t, 0.07).connect(filter("bandpass", 2900, 0.6)).connect(env(t, 0.45 * g, 0.0005, 0.03, 0.08)), t, dur, pan);
+    out(squelch(t, dur, { lp: 1600, f1: between(380, 520), q1: 6, f2: between(1000, 1400), q2: 8, level2: 0.2,
+      peak: 2.4 * g, attack: 0.006, decay: 0.05, wob: between(25, 55), depth: 0.5 }), t, dur, pan);
     for (const f of [4100, 6300]) {
       const o = ctx.createOscillator(); o.frequency.value = f; o.start(t); o.stop(t + 0.04);
       out(o.connect(env(t, 0.035 * g, 0.0005, 0.006, 0.04)), t, 0.04, pan);
@@ -210,9 +210,9 @@ const studioSfx = {
     const o = ctx.createOscillator();
     o.frequency.setValueAtTime(137, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.2); o.frequency.exponentialRampToValueAtTime(42, t + dur);
     o.start(t); o.stop(t + dur + 0.02);
-    out(o.connect(env(t, 0.9 * level, 0.002, 0.10 + 0.05 * size, dur)), t, dur);
-    out(squelch(t, dur, { lp: 1200 + 800 * size, f1: between(300, 420), q1: 5, f2: between(800, 1100), q2: 6, level2: 0.7,
-      peak: 2.2 * level, attack: 0.004, decay: 0.07 + 0.12 * size, wob: 31, depth: 0.4 }), t, dur);
+    out(o.connect(env(t, 0.42 * level, 0.002, 0.10 + 0.05 * size, dur)), t, dur);
+    out(squelch(t, dur, { lp: 1200 + 800 * size, f1: between(300, 420), q1: 5, f2: between(800, 1100), q2: 6, level2: 0.25,
+      peak: 2.8 * level, attack: 0.004, decay: 0.07 + 0.12 * size, wob: 31, depth: 0.4 }), t, dur);
     out(source(studio().crack, t, dur).connect(filter("bandpass", 3700, 0.5)).connect(env(t, (0.25 + 0.5 * size) * level, 0.001, 0.12 + 0.2 * size, dur)), t, dur);
   },
   // a piece landing: a wet flop, and a wooden knock on the board, a dull thud on the floor, or nothing more on the pile
@@ -220,16 +220,16 @@ const studioSfx = {
     if (!can()) return;
     const t = when(0), level = Math.max(0.05, Math.min(0.8, v * 0.32));
     const flop = source(NOISE, t, 0.12).connect(filter("lowpass", surface === "pile" ? 700 : between(500, 900))).connect(filter("bandpass", between(220, 340), 4));
-    out(flop.connect(env(t, 3.2 * level, 0.001, between(0.012, 0.025), 0.12)), t, 0.12, pan);
+    out(flop.connect(env(t, 4.2 * level, 0.001, between(0.012, 0.025), 0.12)), t, 0.12, pan);
     if (surface === "board") {
       const sc = between(0.92, 1.08);                  // the board's own modes
-      for (const [f, d, w] of [[170, 0.05, 1], [395, 0.035, 0.7], [720, 0.025, 0.45], [1180, 0.018, 0.3]]) {
+      for (const [f, d, w] of [[170, 0.05, 1], [395, 0.035, 0.7], [720, 0.025, 0.3], [1180, 0.018, 0.15]]) {
         const o = ctx.createOscillator(); o.frequency.value = f * sc; o.start(t); o.stop(t + 0.22);
         out(o.connect(env(t, 0.17 * w * level, 0.001, d, 0.2)), t, 0.2, pan);
       }
     } else if (surface === "floor") {
       const o = ctx.createOscillator(); o.frequency.value = between(85, 115); o.start(t); o.stop(t + 0.16);
-      out(o.connect(env(t, 0.45 * level, 0.001, 0.03, 0.15)), t, 0.15, pan);
+      out(o.connect(env(t, 0.28 * level, 0.001, 0.03, 0.15)), t, 0.15, pan);
     }
   },
   // a drop of juice landing: a tiny rising blip

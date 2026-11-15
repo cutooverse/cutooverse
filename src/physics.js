@@ -35,9 +35,20 @@ export class Physics {
     if (v) desc.setLinvel(v.x, v.y, v.z);
     if (w) desc.setAngvel({ x: w.x, y: w.y, z: w.z });
     const body = this.world.createRigidBody(desc);
-    let col = shape.box ? RAPIER.ColliderDesc.cuboid(...shape.box) : RAPIER.ColliderDesc.convexHull(shape);
-    if (!col) col = RAPIER.ColliderDesc.ball(shape.radius || 0.005);       // a flat sliver: a small ball will do
-    this.world.createCollider(col.setDensity(density).setFriction(0.7).setRestitution(0.12), body);
+    const dress = col => col.setDensity(density).setFriction(0.7).setRestitution(0.12);
+    const ball = () => RAPIER.ColliderDesc.ball(shape.radius || 0.005);
+    // A sliver (shape.flat: paper-thin or a speck) gets a small ball: the hull of a nearly flat piece
+    // has no volume, so no mass and no centre, and one such body brings the whole world down (a
+    // panic inside Rapier: every call after it fails).
+    const col = shape.box ? RAPIER.ColliderDesc.cuboid(...shape.box) : shape.flat ? ball() : RAPIER.ColliderDesc.convexHull(shape);
+    let made = null;
+    try { made = this.world.createCollider(dress(col || ball()), body); } catch (e) { made = null; }   // no hull at all: Rapier throws here
+    if (made && !shape.box && !shape.flat) {             // and a hull that did come out is checked
+      body.recomputeMassPropertiesFromColliders();
+      const c = body.localCom();
+      if (!(body.mass() > 0) || !Number.isFinite(c.x + c.y + c.z)) { this.world.removeCollider(made, false); made = null; }
+    }
+    if (!made) this.world.createCollider(dress(ball()), body);
     return body;
   }
 
