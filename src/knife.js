@@ -88,6 +88,7 @@ function bolsterShape(y0, y1, top) {
 const WOODS = {                                        // scales: [colour, grain contrast, roughness, lacquer]
   chef: ["#3a2216", 0.45, 0.42, 0.35], cleaver: ["#1b1b1c", 0.25, 0.4, 0.2], gold: ["#15110d", 0.2, 0.3, 0.6], santoku: ["#d3b285", 0.22, 0.6, 0],
 };
+const TRAIL = [[0.02, 0.4], [0.042, 0.2]];              // a flying knife's blur: [metres behind the edge, opacity]
 const built = new Map();                               // kind -> the parts of that knife (geometry, material, placement)
 
 function build(kind) {
@@ -130,19 +131,41 @@ function build(kind) {
   return parts;
 }
 
-export function makeKnife(kind = "chef") {
+// opacity below 1: a see-through copy, for the trail a fast knife leaves on film
+const faint = new Map();                               // opacity -> (a knife's material -> its see-through copy)
+function faintOf(mat, opacity) {
+  if (Array.isArray(mat)) return mat.map(m => faintOf(m, opacity));
+  if (!faint.has(opacity)) faint.set(opacity, new Map());
+  const copies = faint.get(opacity);
+  if (!copies.has(mat)) copies.set(mat, Object.assign(mat.clone(), { transparent: true, opacity, depthWrite: false }));
+  return copies.get(mat);
+}
+export function makeKnife(kind = "chef", opacity = 1) {
   if (!KNIVES[kind]) kind = "chef";
   if (!built.has(kind)) built.set(kind, build(kind));
   const g = new THREE.Group();
   for (const { geo, mat, at } of built.get(kind)) {
-    const m = new THREE.Mesh(geo, mat);
-    at(m); m.castShadow = true;
+    const m = new THREE.Mesh(geo, opacity < 1 ? faintOf(mat, opacity) : mat);
+    at(m); m.castShadow = opacity === 1;
     g.add(m);
+  }
+  return g;
+}
+// A knife in flight, with its motion blur: fainter copies of it trail behind the edge (local +y runs
+// from the edge back to the spine, and the edge leads). Phones fly the knife alone.
+function makeFlyer(kind) {
+  const g = makeKnife(kind);
+  if (perf.low) return g;
+  for (const [back, opacity] of TRAIL) {
+    const t = makeKnife(kind, opacity);
+    t.position.y = back;
+    g.add(t);
   }
   return g;
 }
 
 const UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
+const FLY_SPEED = 3.3;                                 // m/s: the Blender shorts' 0.11 m a frame
 
 // Drives one knife: hovering above the fruit, or chopping down a plane and back up.
 export class KnifeRig {
@@ -153,9 +176,16 @@ export class KnifeRig {
   }
   setKind(kind) {
     if (this.group) this.scene.remove(this.group);
+    this.kind = kind;
     this.group = makeKnife(kind); this.scene.add(this.group);
+    this.stop(true);
   }
-  dispose() { this.scene.remove(this.group); }
+  dispose() { this.scene.remove(this.group); this.stop(true); }
+  // the flying knives stop where they are (a new fruit: their cuts were for the old one)
+  stop(forget = false) {
+    for (const k of this.flock || []) { k.anim = null; k.group.visible = false; if (forget) this.scene.remove(k.group); }
+    if (forget || !this.flock) this.flock = [];
+  }
 
   pose(n) {                                           // blade plane normal n, edge pointing down the plane
     const along = new THREE.Vector3().crossVectors(n, UP);
@@ -171,15 +201,15 @@ export class KnifeRig {
   // fruit's narrow side, centred on the fruit and, for one wider than the blade, enlarged: only the
   // blade passes through it. From above, and it stops short of the board.
   // body: { centre, axes: the fruit's three half-axes in the world, long }
-  flight(n, c, floorY, body) {
+  flight(n, c, floorY, body, lead = 0.36) {
     let best = null;
     for (let i = 0; i < 16 && !(best?.clear >= 0); i++) {  // one that gets right through before the board, else the nearest to it
-      const f = this.flightOnce(n, c, floorY, body);
+      const f = this.flightOnce(n, c, floorY, body, lead);
       if (!best || f.clear > best.clear) best = f;
     }
     return best;
   }
-  flightOnce(n, c, floorY, body) {
+  flightOnce(n, c, floorY, body, lead) {
     const p = this.pose(n);
     const wide = Math.abs(n.y) > 0.85 || body?.long;    // a level plane or a long fruit: any direction in the plane
     const span = a => (body ? Math.hypot(...body.axes.map(ax => ax.dot(a))) : 0.06);   // the fruit's half-width along the blade
@@ -202,7 +232,7 @@ export class KnifeRig {
     const at0 = mid.addScaledVector(a, 0.004 * k + slack);               // where the knife is as its edge meets the plane's middle
     const off = body ? c.clone().sub(body.centre).dot(v) : 0, deep = body ? span(v) : 0.06;
     const through = off + deep + 0.052 * k;                              // how far past the middle the whole blade has left the fruit
-    const before = Math.max(0.36, deep - off + 0.08);
+    const before = Math.max(lead, deep - off + 0.08);
     let after = Math.max(0.30, through + 0.02);
     if (v.y > 0.05) after = Math.max(0, Math.min(after, (at0.y + low) / v.y));
     return { q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(a, v, nn)), k, clear: after - through,
@@ -211,10 +241,11 @@ export class KnifeRig {
 
   // n: plane normal, c: a point on the plane inside the fruit, top: fruit top height, floorY: board top.
   // how: "chop" (down onto the board), "slide" (a level cut, in from the front), "fly" (through the
-  // fruit in the air, edge first: see flight)
+  // fruit in the air, edge first: see flight), "flock" (the same, by a knife of its own: see fly)
   chop(n, c, top, floorY, dur, onImpact, how = "chop", body = null) {
     dur = Math.max(0.05, dur);
     if (this.anim && !this.anim.hit) { this.anim.hit = true; this.anim.onImpact?.(); }   // slow frames: never lose a cut
+    if (how === "flock") return this.fly(n, c, floorY, onImpact, body);
     this.away = null; this.group.visible = true; this.group.scale.setScalar(1);
     if (how === "fly") {
       const f = this.flight(n, c, floorY, body);
@@ -237,7 +268,38 @@ export class KnifeRig {
     return dur * 0.42;                                  // seconds until the blade hits (for the sound)
   }
 
+  // Flurry: every cut has a knife of its own, so several are in the air at once, as in the Blender
+  // shorts. Seconds until this one's edge is in the fruit.
+  fly(n, c, floorY, onImpact, body) {
+    const f = this.flight(n, c, floorY, body, 0.5);    // from out of the picture
+    let k = this.flock.find(x => !x.anim);
+    if (!k && this.flock.length < (perf.low ? 6 : 12)) {
+      k = { group: makeFlyer(this.kind), anim: null };
+      this.scene.add(k.group); this.flock.push(k);
+    }
+    if (!k) {                                           // all in the air: the one nearest its end makes way
+      k = this.flock.reduce((a, b) => (a.anim.t / a.anim.dur > b.anim.t / b.anim.dur ? a : b));
+      if (!k.anim.hit) k.anim.onImpact?.();
+    }
+    k.group.visible = true; k.group.quaternion.copy(f.q); k.group.position.copy(f.from);
+    k.group.scale.setScalar(f.k);
+    k.anim = { line: [f.from, f.to], t: 0, dur: f.from.distanceTo(f.to) / FLY_SPEED, hit: false, onImpact, at: f.at };
+    this.away = 0; this.group.visible = false;          // the knife that waited over the fruit is out of the picture
+    this.path = [f.from, f.to];                         // for its sound: where it flies from and to
+    return k.anim.dur * f.at;
+  }
+
   update(dt) {
+    for (const k of this.flock) {
+      const a = k.anim;
+      if (!a) continue;
+      a.t += dt;
+      const e = a.t / a.dur;
+      k.group.position.lerpVectors(a.line[0], a.line[1], Math.min(1, e));
+      if (!a.hit && e >= a.at) { a.hit = true; a.onImpact?.(); }
+      if (e >= 1) { k.anim = null; k.group.visible = false; }
+      this.away = 0;                                    // not back over the fruit while any of them flies
+    }
     const g = this.group;
     if (this.anim) {
       const a = this.anim; a.t += dt;
@@ -263,7 +325,7 @@ export class KnifeRig {
     this.idleT += dt;                                  // hover above the fruit, breathing a little
     const target = this.home.clone().add(new THREE.Vector3(0, Math.sin(this.idleT * 1.6) * 0.004, 0));
     const qIdle = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0.25, -0.12));
-    if (this.away !== null) {                           // after a flight: a moment out of sight, then back above the fruit
+    if (this.away !== null) {                           // after the flights: a moment out of sight, then back above the fruit
       this.away += dt;
       if (this.away < 0.8) return;                      // longer than the slowest beat: never back between two cuts
       this.away = null;

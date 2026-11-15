@@ -25,8 +25,10 @@ const MIN_PIECE = 0.004;                     // crumbs under 0.4 % of the fruit 
 // stars needed (one per Puzzle level, nine in all); the things a video opens are in tasks.js
 const UNLOCK = { "knife.cleaver": 2, "board.marble": 3, "backdrop.night": 4, "theme.halloween": 4, "material.glass": 6, "board.glass": 8,
   "backdrop.space": 5, "backdrop.neon": 7 };
+const FLOAT_Y = 0.26;                        // Flurry: the fruit's middle floats this high, as in the Blender shorts
 const REAL_SLICE_MAX = 12;                   // up to this many chops the fruit is always really cut,
-// and so is any that makes up to perf.realPieces pieces (300, 120 on phones); above, it bursts into cubes
+// and so is any that makes up to perf.realPieces pieces (300, 120 on phones); above, it bursts into cubes.
+// Flurry is always really cut, into at most perf.realPieces pieces
 
 let stage;
 try { stage = new Stage($("stage")); }
@@ -88,7 +90,10 @@ function spawnFruit(st, withKnife) {
   const f = FRUITS[looks.fruit] || FRUITS.orange, S = SIZES[looks.size] || 1;
   const soup = buildSoup(f, seed++, S);
   const mats = fruitMaterials(f.id, looks.material === "glass", st.i);
-  for (const m of [mats.skin, mats.flesh]) { m.userData.U.uPn.value = 0; m.userData.U.uInv.value = 1 / S; }
+  for (const m of [mats.skin, mats.flesh]) {
+    m.userData.U.uPn.value = 0; m.userData.U.uInv.value = 1 / S;
+    m.userData.U.uLineW.value = looks.style === "flurry" ? 0.0007 : 0.0003;   // Flurry's cut lines read from afar, as in the shorts
+  }
   warmUp(mats);
   const q = new THREE.Quaternion().setFromAxisAngle(UP, (Math.random() - 0.5) * 1.2).multiply(Y_UP);
   const origin = stage.slots[st.i].origin;
@@ -97,9 +102,10 @@ function spawnFruit(st, withKnife) {
   pieces.place(pc, new THREE.Vector3(pc.mesh.position.x, BOARD.h - Math.min(...ys) + 0.002, pc.mesh.position.z), q);
   Object.assign(st, { whole: pc, fruitId: f.id, scale: S, mats, fruitV: soup.V, top: pc.mesh.position.y + Math.max(...ys),
     made: 0, planesW: [], planesO: [], phase: "ready", count: 1, shown: 1, countFrom: 1, countAt: 0, finishAt: 0, next: 0, plan: null, hoverY: 0, best: null, cheered: false,
-    soups: [pc.soup] });
+    soups: [pc.soup], capped: false });
   if (withKnife) {
     if (!st.knife) st.knife = new KnifeRig(stage.scene, looks.knife, new THREE.Vector3());
+    st.knife.stop();                                    // knives still in the air were for the last fruit
     st.knife.home.set(origin.x - 0.03, st.top + 0.08, origin.z + 0.02);
     if (!st.knife.anim) st.knife.group.position.copy(st.knife.home);
   }
@@ -134,6 +140,13 @@ const pace = () => SLOWER[looks.speed] || 1;
 const chopInterval = n => Math.min(0.26, Math.max(0.03, (1.0 + n * 0.03) / n)) * pace();
 // Free style chops for as long as you hold, at a steady beat; Dice and Burst make the chosen count
 const chopTotal = () => (looks.style === "free" ? MAX_CUTS : looks.cuts);
+let lastDrip = 0;                                       // juice drops landing: heard in Flurry, a few a second at most
+stage.onDrip = p => {
+  const now = performance.now();
+  if (looks.style !== "flurry" || now - lastDrip < 90) return;
+  lastDrip = now; sfx.drip(panOf(p, 0));
+};
+const inAir = () => looks.style === "burst" || looks.style === "flurry";   // the fruit floats and knives fly through it
 const beat = st => chopInterval(looks.style === "free" ? REAL_SLICE_MAX : st.total);
 
 // Dice: evenly spaced cuts across the fruit, then along it, then level ones, shared out by its size
@@ -180,9 +193,9 @@ function doChop(st) {
     if (long) o = new THREE.Vector3((Math.random() * 2 - 1) * 0.8, (Math.random() * 2 - 1) * 0.3, (Math.random() * 2 - 1) * 0.3);
     else do { o = new THREE.Vector3((Math.random() * 2 - 1) * 0.72, (Math.random() * 2 - 1) * 0.72, (Math.random() * 2 - 1) * 0.72); } while (o.lengthSq() > 0.52);
     c = new THREE.Vector3(o.x * A[0] * S, o.y * A[1] * S, o.z * A[2] * S).sub(pc.com).applyMatrix4(pc.mesh.matrixWorld);
-    if (style === "burst") {                           // any direction: knives come from every side
+    if (inAir()) {                                     // any direction: knives come from every side
       n = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-      how = "fly";
+      how = style === "flurry" ? "flock" : "fly";
       body = { long, centre: new THREE.Vector3().sub(pc.com).applyMatrix4(pc.mesh.matrixWorld),
         axes: [0, 1, 2].map(i => new THREE.Vector3().setComponent(i, A[i] * S).applyQuaternion(pc.mesh.quaternion)) };
     } else {
@@ -191,9 +204,15 @@ function doChop(st) {
     }
   }
   st.made++;
-  const dur = Math.min((style === "burst" ? 0.15 : 0.24) * Math.min(pace(), 1.8), beat(st) * 0.95);
+  const dur = Math.min((inAir() ? 0.15 : 0.24) * Math.min(pace(), 1.8), beat(st) * 0.95);
   const hitIn = st.knife.chop(n, c, st.top, BOARD.h, dur, () => impact(st, n, c), how, body);
-  sfx.chop(st.made, Math.max(0, hitIn - audioLead()), glassSound());  // started early by the device's sound lag: it lands on the hit
+  const at = Math.max(0, hitIn - audioLead());         // started early by the device's sound lag: it lands on the hit
+  if (how === "flock") {                               // the shorts' sound: the blade passing by, then through the fruit
+    const [p0, p1] = st.knife.path.map(p => panOf(p, st.i));
+    const g = 1 / Math.sqrt(Math.max(1, Math.round(0.2 / beat(st))));   // quieter each, the more of them there are at once
+    sfx.whoosh(at - 0.135, p0, p1, g);
+    if (glassSound()) sfx.chop(st.made, at, true); else sfx.cut(st.made, at, (p0 + p1) / 2, g);
+  } else sfx.chop(st.made, at, glassSound());
 }
 
 function impact(st, n, c) {
@@ -208,15 +227,38 @@ function impact(st, n, c) {
   st.planesO.push([nL.x, nL.y, nL.z, d]);
   st.planesW.push({ n: n.clone(), c: c.clone() });
   // cut the fruit's data a little at every chop (its frame stays the same while it is chopped),
-  // so the ending only has to build the pieces: doing all the cuts at the end froze the game
-  if (st.soups && (looks.style === "free" ? st.planesO.length : st.total) <= REAL_SLICE_MAX && looks.style !== "dice") {
+  // so the ending only has to build the pieces: doing all the cuts at the end froze the game.
+  // Flurry goes on cutting until the fruit is in perf.realPieces pieces, then stops (the lines and
+  // the count go on): it falls apart into that many real pieces, as the Blender shorts cap theirs
+  const flurry = looks.style === "flurry";
+  if (st.soups && !st.capped && (flurry || ((looks.style === "free" ? st.planesO.length : st.total) <= REAL_SLICE_MAX && looks.style !== "dice"))) {
     const dl = nL.dot(cL);
-    st.soups = st.soups.flatMap(s => slice(s, nL, dl) || [s]);
+    st.soups = st.soups.flatMap(s => (crosses(s, nL, dl) && slice(s, nL, dl)) || [s]);
+    if (flurry && st.soups.length >= perf.realPieces) st.capped = true;
   }
   const k = st.planesO.length - 1;
   if (k < Math.min(MAXP, perf.lines)) for (const m of [st.mats.skin, st.mats.flesh]) { m.userData.U.uPl.value[k].set(nL.x, nL.y, nL.z, d); m.userData.U.uPn.value = k + 1; }
   stage.splash(c, n, 2, FRUITS[st.fruitId].juice);
-  if (st.planesO.length >= st.total) st.finishAt = performance.now() + (looks.style === "free" ? 120 : 1);   // straight on: no pause before it falls
+  if (st.planesO.length >= st.total) st.finishAt = performance.now() + ({ free: 120, flurry: 130 }[looks.style] || 1);   // Flurry: 4 frames after the last knife, as in the shorts
+}
+
+// where a point is between the speakers: -1 at the left edge of its picture, 1 at the right
+function panOf(p, i = 0) {
+  const r = stage.slots[i].rect;
+  return Math.max(-1, Math.min(1, ((stage.toScreen(p, i).x - r.x) / r.w - 0.5) * 2));
+}
+
+// does the plane (n, d) pass through this soup? (its bounding ball, worked out once)
+function crosses(s, n, d) {
+  if (!s.ball) {
+    const P = s.P, c = [0, 0, 0];
+    for (let i = 0; i < P.length; i += 3) { c[0] += P[i]; c[1] += P[i + 1]; c[2] += P[i + 2]; }
+    const k = 3 / P.length; c[0] *= k; c[1] *= k; c[2] *= k;
+    let r = 0;
+    for (let i = 0; i < P.length; i += 3) r = Math.max(r, (P[i] - c[0]) ** 2 + (P[i + 1] - c[1]) ** 2 + (P[i + 2] - c[2]) ** 2);
+    s.ball = [c[0], c[1], c[2], Math.sqrt(r)];
+  }
+  return Math.abs(s.ball[0] * n.x + s.ball[1] * n.y + s.ball[2] * n.z - d) < s.ball[3];
 }
 
 // Burst lifts the fruit: if its top would rise behind the buttons or the count, the picture slides
@@ -246,10 +288,11 @@ function finish(st, now) {
   const dice = looks.style === "dice";                 // dice always ends in cubes, the size of its cuts
   const edge = dice ? diceEdge(st) : 0;
   const made = st.planesO.length;                      // Free style stops wherever you let go
-  const estimate = made <= REAL_SLICE_MAX && !dice ? 0 : countPieces(f, st.planesO);
-  if (!dice && (made <= REAL_SLICE_MAX || estimate <= perf.realPieces)) {
+  const flurry = looks.style === "flurry";             // always real pieces; past the cap the count is worked out
+  const estimate = flurry ? (st.capped ? countPieces(f, st.planesO) : 0) : made <= REAL_SLICE_MAX && !dice ? 0 : countPieces(f, st.planesO);
+  if (!dice && (flurry || made <= REAL_SLICE_MAX || estimate <= perf.realPieces)) {
     const one = made === 1, style = looks.style, whole = st.whole, centre = whole.mesh.position.clone();
-    if (st.soups && made <= REAL_SLICE_MAX) {      // already cut chop by chop: just build the pieces
+    if (st.soups && (flurry || made <= REAL_SLICE_MAX)) {   // already cut chop by chop: just build the pieces
       const pos = whole.mesh.position.clone(), quat = whole.mesh.quaternion.clone();
       const soups = st.soups.length > 1 ? st.soups : [];
       if (soups.length) {
@@ -269,14 +312,16 @@ function finish(st, now) {
       if (d.lengthSq() < 1e-8) d.set(Math.random() - 0.5, 0, Math.random() - 0.5);
       d.normalize();
       p.pinned = false;
-      pieces.velocity(p, d.multiplyScalar(out * (0.8 + Math.random() * 0.4)).add(new THREE.Vector3(0, style === "burst" ? 0 : 0.04, 0)),
+      pieces.velocity(p, d.multiplyScalar(out * (0.8 + Math.random() * 0.4)).add(new THREE.Vector3(0, inAir() ? 0 : 0.04, 0)),
         new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(style === "dice" ? 0.4 : 2.2));
     }
-    st.count = pieces.inSlot(st.i).filter(p => p.V > MIN_PIECE * st.fruitV).length;
+    st.count = Math.max(flurry ? estimate : 0, pieces.inSlot(st.i).filter(p => p.V > MIN_PIECE * st.fruitV).length);
     st.phase = "done";
     keepBest(st);
-    if (glassSound()) sfx.shatter(); else sfx.slice();
-    sfx.chord(); buzz("chop");
+    const many = flurry && made > REAL_SLICE_MAX;  // a real burst: its sound and shake
+    if (glassSound()) sfx.shatter(); else if (flurry) sfx.splat(made > 1 ? Math.min(1, Math.log(made) / Math.log(50)) : 0); else sfx.slice();
+    sfx.chord(); buzz(many ? "burst" : "chop");
+    if (many) game.shake = 0.012;
   } else {
     st.count = estimate;
     const pc = st.whole;
@@ -600,7 +645,7 @@ const LOOK_TABS = ["fruit", "cut", "scene"];
 const TAB_ICON = { fruit: "i-fruit", cut: "i-chop", scene: "i-scene" };
 // glass cracks and a shatter (the setting, or "auto" with the glass material), else the knife
 const glassSound = () => store.settings.cutSound === "glass" || (store.settings.cutSound === "auto" && looks.material === "glass");
-const STYLES = ["free", "dice", "burst"], CAMS = ["top", "front", "close"], NOTES = ["off", "piano", "organ", "musicbox", "marimba", "glass"];
+const STYLES = ["free", "dice", "burst", "flurry"], CAMS = ["top", "front", "close"], NOTES = ["off", "piano", "organ", "musicbox", "marimba", "glass"];
 
 function itemName(cat, id) {
   if (cat === "fruit") return FRUITS[id].name[getLang()];
@@ -994,12 +1039,14 @@ stage.renderer.setAnimationLoop(now => {
   for (const st of game.slots) {
     const pc = st.whole;
     if (game.screen === "play" && game.holding && st.knife && pc && st.made < st.total && now >= st.next) {
-      if (looks.style === "burst" && !pc.pinned) {        // Burst: the fruit first rises into the air
+      if (inAir() && !pc.pinned) {                        // Burst and Flurry: the fruit first rises into the air
         pc.pinned = true;
-        st.hoverY = pc.mesh.position.y + 0.13;
-        st.knife.home.y += 0.13;
+        const rise = looks.style === "flurry" ? Math.max(0.13, FLOAT_Y - pc.mesh.position.y) : 0.13;
+        st.hoverY = pc.mesh.position.y + rise;
+        st.knife.home.y += rise;
         st.next = now + 420;
-        keepUnderHud(pc, 0.13);
+        keepUnderHud(pc, rise);
+        if (looks.style === "flurry") sfx.lift();
       } else {
         st.phase = "chop";
         doChop(st);
@@ -1023,7 +1070,14 @@ stage.renderer.setAnimationLoop(now => {
   }
   pieces.beforeStep();
   phys.step(gdt);
-  pieces.afterStep(v => { if (now - game.lastLand > 70) { game.lastLand = now; sfx.land(v); } });
+  pieces.afterStep((v, pc) => {
+    if (looks.style === "flurry") {                      // the shorts' sound: a knock on the board, a thud on the floor, a flop on the pile
+      if (now - game.lastLand < 45) return;
+      game.lastLand = now;
+      const p = pc.mesh.position, ground = stage.groundAt(p.x, p.z);
+      sfx.impact(v, ground === 0 ? "floor" : p.y - pc.R > ground + 0.012 ? "pile" : "board", panOf(p, pc.slot));
+    } else if (now - game.lastLand > 70) { game.lastLand = now; sfx.land(v); }
+  });
   stage.stepDrops(gdt);
   if (game.verdictAt && now > game.verdictAt) { game.verdictAt = 0; verdict(); }
   hud();

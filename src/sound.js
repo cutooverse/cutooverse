@@ -109,7 +109,151 @@ function note(step, at = 0, gain = 0.16) {
   if (ins) voice(stepFreq(step) * ins.oct, ins.p, { at, attack: ins.attack, gain });
 }
 
+// ---------------------------------------------------------------------------------------------
+// The Blender shorts' sound set (chicken/post/sfx.py), made live for the Flurry style: a knife's
+// pass-by, the wet slice, the burst, pieces knocking on the board, drips. They go through a small
+// room and a limiter of their own, panned to where the thing is on screen (pan: -1 left, 1 right).
+let ST = null;
+function studio() {
+  if (ST?.ctx === ctx) return ST;
+  const sr = ctx.sampleRate, rnd = () => Math.random() * 2 - 1;
+  const limit = ctx.createDynamicsCompressor();        // a flurry of a hundred knives must not clip
+  limit.threshold.value = -16; limit.knee.value = 10; limit.ratio.value = 4; limit.attack.value = 0.003; limit.release.value = 0.12;
+  limit.connect(master);
+  const bus = ctx.createGain(); bus.connect(limit);
+  const len = Math.floor(sr * 0.6), ir = ctx.createBuffer(2, len, sr);   // the room: 0.38 s, a few early reflections
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    let lp = 0, e = 0;
+    for (let i = 1; i < len; i++) { lp += (rnd() * Math.exp(-6.9 * i / sr / 0.38) - lp) * 0.45; d[i] = lp * 0.35; }
+    for (const [t, g] of [[0.007, 0.5], [0.013, 0.35], [0.019, 0.3], [0.027, 0.22], [0.034, 0.18]]) d[Math.floor((t + rnd() * 0.002) * sr)] += g * Math.sign(rnd());
+    for (let i = 0; i < len; i++) e += d[i] * d[i];
+    for (let i = 0; i < len; i++) d[i] /= Math.sqrt(e);
+  }
+  const room = ctx.createConvolver(); room.normalize = false; room.buffer = ir;
+  const wet = ctx.createGain(); wet.gain.value = 0.16;
+  bus.connect(room).connect(wet).connect(limit);
+  const crack = ctx.createBuffer(1, sr, sr), c = crack.getChannelData(0);   // sparse clicks: skin crackling
+  for (let k = 0; k < 650; k++) c[Math.floor(Math.random() * sr)] = (0.3 + Math.random() * 0.7) * Math.sign(rnd());
+  ST = { ctx, bus, crack };
+  return ST;
+}
+const can = () => sound.on && unlock() && ready();
+const when = at => (OFFLINE ? T0 : ctx.currentTime) + Math.max(0, at);
+const between = (a, b) => a + Math.random() * (b - a);
+// the end of a sound's chain: its place between the speakers (moving from p0 to p1), into the room
+function out(node, t, dur, p0 = 0, p1 = p0) {
+  const clip = p => Math.max(-1, Math.min(1, p || 0));
+  if (ctx.createStereoPanner) {
+    const p = ctx.createStereoPanner();
+    p.pan.setValueAtTime(clip(p0), t); p.pan.linearRampToValueAtTime(clip(p1), t + dur);
+    node = node.connect(p);
+  }
+  node.connect(studio().bus);
+}
+function source(buffer, t, dur) {
+  const s = ctx.createBufferSource(); s.buffer = buffer;
+  s.start(t, Math.random() * (1 - Math.min(dur, 0.9)), dur + 0.02);
+  return s;
+}
+const filter = (type, f, q = 0.7) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
+// loudness over a sound: up in `attack`, then dying away at the rate `decay` (seconds to fall to 37 %)
+function env(t, peak, attack, decay, dur) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + attack);
+  g.gain.setTargetAtTime(0.0001, t + attack, decay);
+  g.gain.setValueAtTime(0.0001, t + dur);
+  return g;
+}
+// wet flesh: noise through two mouth-like resonances, its loudness wobbling
+function squelch(t, dur, { lp, f1, q1, f2, q2, level2, peak, attack, decay, wob, depth }) {
+  const src = source(NOISE, t, dur), low = src.connect(filter("lowpass", lp));
+  const e = env(t, peak, attack, decay, dur);
+  low.connect(filter("bandpass", f1, q1)).connect(e);
+  const second = ctx.createGain(); second.gain.value = level2;
+  low.connect(filter("bandpass", f2, q2)).connect(second).connect(e);
+  const shake = ctx.createGain(); shake.gain.value = 1;
+  const lfo = ctx.createOscillator(), amount = ctx.createGain();
+  lfo.frequency.value = wob; amount.gain.value = depth;
+  lfo.connect(amount).connect(shake.gain); lfo.start(t); lfo.stop(t + dur + 0.02);
+  return e.connect(shake);
+}
+const studioSfx = {
+  // a blade passing by: a band of noise that rises as it nears and falls as it leaves; `at` is its start
+  whoosh(at = 0, p0 = 0, p1 = 0, g = 1) {
+    if (!can()) return;
+    const t = when(at), dur = 0.30, mid = 0.135;
+    const band = filter("bandpass", 380, 1.1);
+    band.frequency.setValueAtTime(380, t); band.frequency.exponentialRampToValueAtTime(2400, t + mid); band.frequency.exponentialRampToValueAtTime(520, t + dur);
+    const amp = ctx.createGain(), curve = new Float32Array(24);
+    for (let i = 0; i < 24; i++) curve[i] = 0.27 * g * Math.exp(-((((i / 23) * dur - mid) / 0.075) ** 2));
+    amp.gain.setValueCurveAtTime(curve, t, dur);
+    out(source(NOISE, t, dur).connect(band).connect(filter("lowpass", 4500)).connect(amp), t, dur, p0, p1);
+  },
+  // the knife through the fruit: crisp skin crackle, a wet squelch, a faint tick of metal (and the note)
+  cut(i = 0, at = 0, pan = 0, g = 1) {
+    if (!can()) return;
+    const t = when(at), dur = between(0.11, 0.17);
+    out(source(studio().crack, t, 0.07).connect(filter("bandpass", 2900, 0.6)).connect(env(t, 0.55 * g, 0.0005, 0.03, 0.08)), t, dur, pan);
+    out(squelch(t, dur, { lp: 1600, f1: between(380, 520), q1: 6, f2: between(1000, 1400), q2: 8, level2: 0.6,
+      peak: 1.9 * g, attack: 0.006, decay: 0.05, wob: between(25, 55), depth: 0.5 }), t, dur, pan);
+    for (const f of [4100, 6300]) {
+      const o = ctx.createOscillator(); o.frequency.value = f; o.start(t); o.stop(t + 0.04);
+      out(o.connect(env(t, 0.035 * g, 0.0005, 0.006, 0.04)), t, 0.04, pan);
+    }
+    note(runStep(Math.max(0, i - 1)), at);
+  },
+  // the burst: a low thump, a squelch and a spray of crackle; longer and wetter for more cuts (size 0..1)
+  splat(size = 0.5, at = 0) {
+    if (!can()) return;
+    const t = when(at), dur = 0.30 + 0.5 * size, level = (0.6 + 0.4 * size) * (0.55 + 0.25 * size);
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(137, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.2); o.frequency.exponentialRampToValueAtTime(42, t + dur);
+    o.start(t); o.stop(t + dur + 0.02);
+    out(o.connect(env(t, 0.9 * level, 0.002, 0.10 + 0.05 * size, dur)), t, dur);
+    out(squelch(t, dur, { lp: 1200 + 800 * size, f1: between(300, 420), q1: 5, f2: between(800, 1100), q2: 6, level2: 0.7,
+      peak: 2.2 * level, attack: 0.004, decay: 0.07 + 0.12 * size, wob: 31, depth: 0.4 }), t, dur);
+    out(source(studio().crack, t, dur).connect(filter("bandpass", 3700, 0.5)).connect(env(t, (0.25 + 0.5 * size) * level, 0.001, 0.12 + 0.2 * size, dur)), t, dur);
+  },
+  // a piece landing: a wet flop, and a wooden knock on the board, a dull thud on the floor, or nothing more on the pile
+  impact(v = 1, surface = "board", pan = 0) {
+    if (!can()) return;
+    const t = when(0), level = Math.max(0.05, Math.min(0.8, v * 0.32));
+    const flop = source(NOISE, t, 0.12).connect(filter("lowpass", surface === "pile" ? 700 : between(500, 900))).connect(filter("bandpass", between(220, 340), 4));
+    out(flop.connect(env(t, 3.2 * level, 0.001, between(0.012, 0.025), 0.12)), t, 0.12, pan);
+    if (surface === "board") {
+      const sc = between(0.92, 1.08);                  // the board's own modes
+      for (const [f, d, w] of [[170, 0.05, 1], [395, 0.035, 0.7], [720, 0.025, 0.45], [1180, 0.018, 0.3]]) {
+        const o = ctx.createOscillator(); o.frequency.value = f * sc; o.start(t); o.stop(t + 0.22);
+        out(o.connect(env(t, 0.17 * w * level, 0.001, d, 0.2)), t, 0.2, pan);
+      }
+    } else if (surface === "floor") {
+      const o = ctx.createOscillator(); o.frequency.value = between(85, 115); o.start(t); o.stop(t + 0.16);
+      out(o.connect(env(t, 0.45 * level, 0.001, 0.03, 0.15)), t, 0.15, pan);
+    }
+  },
+  // a drop of juice landing: a tiny rising blip
+  drip(pan = 0) {
+    if (!can()) return;
+    const t = when(0), o = ctx.createOscillator(), f = between(1400, 2200);
+    o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 2.2, t + 0.05);
+    o.start(t); o.stop(t + 0.07);
+    out(o.connect(env(t, 0.05, 0.001, 0.012, 0.06)), t, 0.06, pan);
+  },
+  // the fruit rising off the board: a soft breath of air
+  lift() {
+    if (!can()) return;
+    const t = when(0), dur = 0.42, band = filter("bandpass", 260, 0.8);
+    band.frequency.setValueAtTime(260, t); band.frequency.exponentialRampToValueAtTime(950, t + dur);
+    const amp = ctx.createGain(), curve = new Float32Array(24);
+    for (let i = 0; i < 24; i++) curve[i] = 0.16 * Math.sin(Math.PI * i / 23) ** 1.5;
+    amp.gain.setValueCurveAtTime(curve, t, dur);
+    out(source(NOISE, t, dur).connect(band).connect(amp), t, dur);
+  },
+};
+
 export const sfx = {
+  ...studioSfx,
   swish() { noise(0.18, { f0: 5200, f1: 900, q: 1.2, gain: 0.45 }); },
   slice() { noise(0.12, { f0: 900, f1: 300, q: 0.8, gain: 0.8 }); noise(0.07, { f0: 2600, f1: 1800, q: 3, gain: 0.22 }); },
   chop(i = 0, at = 0, glass = false) {                // knife through fruit into the board, `at` s from now

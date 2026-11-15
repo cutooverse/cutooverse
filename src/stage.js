@@ -345,7 +345,7 @@ export class Stage {
         if (!d.stuck) {
           d.v.y += -9.8 * dt; d.p.addScaledVector(d.v, dt);
           const g = this.groundAt(d.p.x, d.p.z);
-          if (d.p.y < g + 0.0006) { d.p.y = g + 0.0006; d.stuck = true; }
+          if (d.p.y < g + 0.0006) { d.p.y = g + 0.0006; d.stuck = true; this.onDrip?.(d.p); }
         }
       }
       const s = d.life > 0 ? Math.min(1, d.life) * (0.6 + (i % 5) * 0.15) : 0;

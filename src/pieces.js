@@ -101,7 +101,7 @@ export class Pieces {
       const t = pc.body.translation(), r = pc.body.rotation();
       pc.mesh.position.set(t.x, t.y, t.z); pc.mesh.quaternion.set(r.x, r.y, r.z, r.w);
       const vy = pc.body.linvel().y;
-      if (pc.vy < -0.45 && vy > pc.vy * 0.4 && onLand && performance.now() - pc.landed > 200) { pc.landed = performance.now(); onLand(-pc.vy); }
+      if (pc.vy < -0.45 && vy > pc.vy * 0.4 && onLand && performance.now() - pc.landed > 200) { pc.landed = performance.now(); onLand(-pc.vy, pc); }
       pc.vy = vy;
     }
   }

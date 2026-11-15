@@ -131,6 +131,7 @@ body[data-backdrop="light"] .counter .best.new { color: #b06a00; }
   background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: auto; }
 .stylebar button { padding: 9px 15px; border-radius: 999px; font-weight: 800; font-size: 14px; color: var(--ink-soft); white-space: nowrap; }
 .stylebar button[aria-pressed="true"] { background: var(--ink); color: #12302f; }
+@media (max-width: 440px) { .stylebar { gap: 2px; } .stylebar button { padding: 9px 10px; font-size: 13px; } }   /* four styles and the speed on a phone */
 .stylebar .speed { margin-inline-start: 4px; border-inline-start: 1px solid var(--line); border-radius: 0 999px 999px 0; color: var(--ink); }
 [dir="rtl"] .stylebar .speed { border-radius: 999px 0 0 999px; }
 body[data-backdrop="light"] .stylebar button[aria-pressed="true"] { color: #fff; }
