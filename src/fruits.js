@@ -20,6 +20,14 @@ import carrot from "./fruits/carrot.js";
 import banana from "./fruits/banana.js";
 import pineapple from "./fruits/pineapple.js";
 import bamboo from "./fruits/bamboo.js";
+import apple from "./fruits/apple.js";
+import pear from "./fruits/pear.js";
+import tomato from "./fruits/tomato.js";
+import avocado from "./fruits/avocado.js";
+import peach from "./fruits/peach.js";
+import { onion, redonion } from "./fruits/onion.js";
+import eggplant from "./fruits/eggplant.js";
+import papaya from "./fruits/papaya.js";
 import { mulberry32, lumps, sm, v3 } from "./fruitkit.js";
 export { mulberry32 };
 
@@ -199,6 +207,21 @@ export const FRUITS = {
     skin: citrusSkin([0.90, 0.68, 0.02], [1.0, 0.86, 0.12], [0.76, 0.55, 0.0]),
     flesh: citrusFlesh([1.0, 0.94, 0.46], [0.90, 0.78, 0.20], [1.0, 0.97, 0.62], [0.98, 0.82, 0.10], [0.90, 0.93], true),
   },
+  lime: {
+    name: { en: "Lime", fa: "لیمو ترش" }, axes: [0.050, 0.045, 0.045], juice: 0xcfe86a, tint: 0x8fc22a,
+    radius(rnd) {
+      const L = lumps(rnd, 10, 0.012, 0.2, 0.5);
+      return v => 1 + L(v) + 0.07 * Math.exp(-(1 + v.x) / 0.010) + 0.03 * Math.exp(-(1 - v.x) / 0.010) - 0.03 * Math.exp(-(1 - v.x) / 0.0015);
+    },
+    skin: citrusSkin([0.16, 0.38, 0.04], [0.36, 0.58, 0.08], [0.10, 0.26, 0.03]),
+    flesh: citrusFlesh([0.84, 0.92, 0.50], [0.60, 0.76, 0.22], [0.90, 0.96, 0.62], [0.30, 0.52, 0.06], [0.91, 0.94], false),
+  },
+  grapefruit: {
+    name: { en: "Grapefruit", fa: "گریپ‌فروت" }, axes: [0.064, 0.068, 0.068], juice: 0xff7a66, tint: 0xff6a50,
+    radius(rnd) { const L = lumps(rnd, 10, 0.010, 0.2, 0.5); return v => 1 + L(v) - 0.035 * Math.exp(-(1 - v.x) / 0.003) - 0.025 * Math.exp(-(1 + v.x) / 0.004); },
+    skin: citrusSkin([0.94, 0.62, 0.10], [1.0, 0.80, 0.26], [0.80, 0.50, 0.05]),
+    flesh: citrusFlesh([0.98, 0.40, 0.34], [0.84, 0.18, 0.22], [1.0, 0.56, 0.46], [0.98, 0.74, 0.20], [0.83, 0.87], false),
+  },
   kiwi: {
     name: { en: "Kiwi", fa: "کیوی" }, axes: [0.055, 0.042, 0.040], juice: 0x8fd13a, tint: 0x7bc030,
     radius(rnd) { const L = lumps(rnd, 12, 0.015, 0.15, 0.4); return v => 1 + L(v) - 0.06 * Math.exp(-(1 - v.x) / 0.004) + 0.035 * Math.exp(-(1 + v.x) / 0.002); },
@@ -228,6 +251,8 @@ export const FRUITS = {
 };
 // the rest of the Blender project's fruits, one module each
 Object.assign(FRUITS, { potato, mango, strawberry, dragonfruit, melon, coconut, pumpkin, cucumber, carrot, banana, pineapple, bamboo });
+// and fruits of the game's own
+Object.assign(FRUITS, { apple, pear, peach, tomato, avocado, papaya, eggplant, onion, redonion });
 for (const [id, f] of Object.entries(FRUITS)) f.id = id;
 export const FRUIT_IDS = Object.keys(FRUITS);
 
